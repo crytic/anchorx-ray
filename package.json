@@ -1,0 +1,29 @@
+{
+  "name": "anchorx-ray",
+  "version": "1.0.0",
+  "main": "index.js",
+  "bin": {
+    "anchorx-ray": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts",
+    "start": "node ./dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.30.1",
+    "@solana/web3.js": "^1.98.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "open": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.6",
+    "@types/express": "^5.0.0",
+    "@types/open": "^6.1.0",
+    "ts-node": "^10.9.2"
+  }
+}

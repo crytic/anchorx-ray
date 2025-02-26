@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solana Accounts Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            position: relative;
+            width: 100%;
+            height: 1200px;
+        }
+        .card {
+            border-radius: 12px;
+            padding: 16px;
+            color: #fff;
+            text-align: left;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            position: absolute;
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.2s ease-in-out;
+            overflow: hidden;
+            resize: none;
+        }
+        .card:hover {
+            transform: scale(1.05);
+        }
+        .program { background-color: rgba(156, 39, 176, 0.8); }
+        .wallet { background-color: rgba(76, 175, 80, 0.8); }
+        .data-account { background-color: rgba(0, 122, 204, 0.8); }
+        .pda { background-color: rgba(255, 152, 0, 0.8); }
+        
+        .label {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 6px 10px;
+            border-radius: 6px;
+            display: inline-block;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .decoded-data {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.15);
+            text-align: left;
+        }
+        
+        .resize-handle {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            bottom: 4px;
+            right: 4px;
+            cursor: se-resize;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 3px;
+        }
+
+        .svg-container {
+            width: 100%;
+            height: 1200px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+        svg {
+            width: 100%;
+            height: 1200px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <div v-for="account in accounts" 
+                 :key="account.address"
+                 :class="['card', getTypeClass(account.accountType)]"
+                 :style="{ 
+                     left: account.x + 'px', 
+                     top: account.y + 'px',
+                     width: account.width + 'px', 
+                     height: account.height + 'px' 
+                 }"
+                 @mousedown="startDrag($event, account)">
+                <div><h3 style="text-align: center;">{{ account.name }}</h3></div>
+                <div><span class="label">Address:</span> {{ account.address }}</div>
+                <div><span class="label">Owner:</span> {{ account.owner }}</div>
+                <div><span class="label">Lamports:</span> {{ account.lamports }}</div>
+                <div><span class="label">Data Size:</span> {{ account.dataSize }} bytes</div>
+                <div><span class="label">Executable:</span> {{ account.executable ? 'Yes ✅' : 'No ❌' }}</div>
+
+                <div v-if="account.decodedData" class="decoded-data">
+                    <div style="text-align: center;">Data</div>
+                    <div v-for="(value, key) in account.decodedData" :key="key">
+                        <span class="label">{{ key }}:</span> {{ value }}
+                    </div>
+                </div>
+
+                <!-- Resize Handle -->
+                <div class="resize-handle" 
+                     @mousedown.stop="startResize($event, account)">
+                </div>
+            </div>
+        </div>
+        <div class="svg-container">
+            <svg>
+                <line v-for="(link, index) in links" 
+                      :key="index"
+                      :x1="link.target.x + link.target.width / 2" 
+                      :y1="link.target.y + link.target.height + 50"
+                      :x2="link.source.x + link.source.width / 2" 
+                      :y2="link.source.y" 
+                      stroke="#89969F" stroke-width="2" marker-end="url(#arrowhead)" />
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                            refX="10" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#89969F" />
+                    </marker>
+                </defs>
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                accounts: [],
+                links: [],
+                dragging: null,
+                resizing: null,
+                offsetX: 0,
+                offsetY: 0
+            },
+            mounted() {
+                fetch('/data')
+                    .then(response => response.json())
+                    .then(data => {
+                        this.assignPositions(data);
+                        this.buildLinks();
+                    })
+                    .catch(error => console.error('Error loading accounts data:', error));
+
+                document.addEventListener("mousemove", this.onDrag);
+                document.addEventListener("mouseup", this.stopDrag);
+
+                document.addEventListener("mousemove", this.onResize);
+                document.addEventListener("mouseup", this.stopResize);
+            },
+            methods: {
+                getTypeClass(type) {
+                    return {
+                        'Program': 'program',
+                        'Wallet': 'wallet',
+                        'Data Account': 'data-account',
+                        'PDA': 'pda'
+                    }[type] || 'data-account';
+                },
+                assignPositions(accounts) {
+                    let gridSizeX = 350;
+                    let gridSizeY = 250;
+                    let columns = Math.ceil(Math.sqrt(accounts.length));
+
+                    accounts.forEach((account, index) => {
+                        this.$set(account, 'x', (index % columns) * gridSizeX + 150);
+                        this.$set(account, 'y', Math.floor(index / columns) * gridSizeY + 150);
+                        this.$set(account, 'width', 250);
+                        this.$set(account, 'height', 180);
+                    });
+
+                    this.accounts = accounts;
+                },
+                buildLinks() {
+                    this.links = this.accounts.map(account => {
+                        let owner = this.accounts.find(a => a.address === account.owner);
+                        if (owner) {
+                            return { source: account, target: owner };
+                        }
+                        return null;
+                    }).filter(link => link !== null);
+                },
+                startDrag(event, account) {
+                    this.dragging = account;
+                    this.offsetX = event.clientX - account.x;
+                    this.offsetY = event.clientY - account.y;
+                },
+                onDrag(event) {
+                    if (!this.dragging) return;
+                    
+                    this.dragging.x = event.clientX - this.offsetX;
+                    this.dragging.y = event.clientY - this.offsetY;
+
+                    this.$forceUpdate();
+                },
+                stopDrag() {
+                    this.dragging = null;
+                },
+                startResize(event, account) {
+                    this.resizing = account;
+                    event.preventDefault();
+                },
+                onResize(event) {
+                    if (!this.resizing) return;
+
+                    this.resizing.width = Math.max(180, event.clientX - this.resizing.x);
+                    this.resizing.height = Math.max(150, event.clientY - this.resizing.y);
+
+                    this.$forceUpdate();
+                },
+                stopResize() {
+                    this.resizing = null;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
