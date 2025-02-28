@@ -21,7 +21,7 @@ Ensure you have the following installed:
 
 ## Installation
 ```sh
-npm install https://github.com/crytic/anchorx-ray
+npm install anchorx-ray
 ```
 
 ## Configuration

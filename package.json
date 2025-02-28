@@ -16,6 +16,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",
     "@solana/web3.js": "^1.98.0",
+    "anchorx-ray": "^0.1.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "open": "^10.1.0"
