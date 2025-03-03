@@ -1,0 +1,57 @@
+[
+  {
+    "name": "program_test",
+    "address": "7Yi8tUvTPwop1ysZjvBmYefmoG9DUT6qdYZxqvkzwXmr",
+    "owner": "11111111111111111111111111111111",
+    "lamports": 0,
+    "executable": true,
+    "dataSize": 0,
+    "accountType": "Program",
+    "decodedData": null
+  },
+  {
+    "name": "PDAaccountInfo",
+    "address": "4EHG1jBr5bWtQqefqtGgnYRaPzj7aovwtZ45UHFYSGEk",
+    "owner": "7Yi8tUvTPwop1ysZjvBmYefmoG9DUT6qdYZxqvkzwXmr",
+    "lamports": 1726080,
+    "executable": false,
+    "dataSize": 120,
+    "accountType": "PDA",
+    "decodedData": {
+      "info1": "00",
+      "info2": "00",
+      "info3": false,
+      "name": ""
+    }
+  },
+  {
+    "name": "NormalAccount",
+    "address": "7EESYUXXRh1FstvaWnXDxUhucbziUjg9AKxr2keBHQhj",
+    "owner": "7Yi8tUvTPwop1ysZjvBmYefmoG9DUT6qdYZxqvkzwXmr",
+    "lamports": 2004480,
+    "executable": false,
+    "dataSize": 160,
+    "accountType": "Data Account",
+    "decodedData": {
+      "bool1": true,
+      "bool2": false,
+      "bool3": true,
+      "counter": 1
+    }
+  },
+  {
+    "name": "PDAaccountInfo",
+    "address": "EY1z3Kq6W8ezW5CeFYBVHebQjkPyzUoW5ZxRattdWj7c",
+    "owner": "7Yi8tUvTPwop1ysZjvBmYefmoG9DUT6qdYZxqvkzwXmr",
+    "lamports": 1726080,
+    "executable": false,
+    "dataSize": 120,
+    "accountType": "PDA",
+    "decodedData": {
+      "info1": "c8",
+      "info2": "-64",
+      "info3": false,
+      "name": "UpdatedPDA"
+    }
+  }
+]
