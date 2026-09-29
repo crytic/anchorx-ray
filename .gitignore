@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.anchorx-ray/
+.DS_Store
+.env
+examples/*/target/
+examples/*/test-ledger/
+examples/*/.anchor/
+test-results/

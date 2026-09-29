@@ -1,0 +1,26 @@
+{
+  "name": "anchorx-ray-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter ./packages/* build",
+    "typecheck": "pnpm -r --filter ./packages/* typecheck",
+    "lint": "oxlint --deny-warnings packages",
+    "format": "oxfmt packages",
+    "format:check": "oxfmt --check packages",
+    "test": "vitest run --project unit",
+    "test:e2e": "vitest run --project e2e",
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "oxfmt": "0.71.0",
+    "oxlint": "1.86.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.2"
+  }
+}

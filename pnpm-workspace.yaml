@@ -1,0 +1,11 @@
+packages:
+  - packages/*
+
+# Supply chain: wait 24h after publish before a version can be installed,
+# and never run dependency lifecycle scripts.
+minimumReleaseAge: 1440
+onlyBuiltDependencies: []
+# Optional native speedups for `ws`; the pure-JS fallback is fine.
+ignoredBuiltDependencies:
+  - bufferutil
+  - utf-8-validate
