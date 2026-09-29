@@ -1,4 +1,5 @@
-import { BN, type Idl, type IdlType } from "@anchor-lang/core";
+import type { Idl, IdlType } from "@anchor-lang/core";
+import { BN } from "./anchor.js";
 import { PublicKey } from "@solana/web3.js";
 
 const INT_WIDTH: Record<string, number> = {

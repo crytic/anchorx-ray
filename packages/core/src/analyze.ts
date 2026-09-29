@@ -205,6 +205,53 @@ function summarize(codecs: CodecRegistry, nodes: Nodes): ProgramSummary[] {
   }));
 }
 
+const GENERIC_ROLES = new Set(["system_program", "program", "event_authority", "rent", "clock"]);
+
+const byFrequency = (counts: Map<string, number>) =>
+  [...counts].toSorted((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([role]) => role);
+
+/** Instruction account names each address appeared under, most frequent first. */
+function rolesByAddress(bindings: InstructionBinding[]): Map<string, string[]> {
+  const counts = new Map<string, Map<string, number>>();
+  for (const b of bindings) {
+    for (const [name, address] of b.scope.accounts) {
+      const role = name.split(".").at(-1) ?? name;
+      if (GENERIC_ROLES.has(role)) continue;
+      const perAddress = counts.get(address) ?? new Map<string, number>();
+      counts.set(address, perAddress.set(role, (perAddress.get(role) ?? 0) + 1));
+    }
+  }
+  return new Map([...counts].map(([address, m]) => [address, byFrequency(m)]));
+}
+
+function labelWallets(nodes: Nodes, bindings: InstructionBinding[]): void {
+  const roles = rolesByAddress(bindings);
+  for (const node of nodes.values()) {
+    const seen = roles.get(node.address);
+    if (!seen) continue;
+    node.roles = seen;
+    if (node.kind === "wallet") node.label = seen.slice(0, 2).join(" · ");
+  }
+}
+
+function labelMissing(nodes: Nodes, edges: Edge[]): void {
+  for (const edge of edges.filter((e) => e.kind === "field")) {
+    const target = nodes.get(edge.to);
+    const source = nodes.get(edge.from);
+    if (target?.label !== "missing" || !source) continue;
+    target.label = `${source.typeName ?? source.label}.${edge.label}`;
+  }
+}
+
+/**
+ * Gives wallets and missing accounts a meaningful label: the instruction roles
+ * a wallet was passed as, or the field that points to a missing account.
+ */
+function nameAnonymous(nodes: Nodes, edges: Edge[], bindings: InstructionBinding[]): void {
+  labelWallets(nodes, bindings);
+  labelMissing(nodes, edges);
+}
+
 function markUndeployed(programs: ProgramSummary[], nodes: Nodes): void {
   for (const program of programs.filter((p) => !p.deployed)) {
     const node = nodes.get(program.id) ?? missingNode(program.id);
@@ -239,6 +286,7 @@ export function buildModel(
   const typeOf = (address: string) => index.decoded.get(address)?.typeName;
   const edges = buildEdges(nodes, index, hasOneConstraints(codecs, bindings, typeOf));
   danglingFindings(nodes, edges);
+  nameAnonymous(nodes, edges, bindings);
   const programs = summarize(codecs, nodes);
   markUndeployed(programs, nodes);
   const accounts = [...nodes.values()];

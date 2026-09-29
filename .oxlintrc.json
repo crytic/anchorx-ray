@@ -33,7 +33,16 @@
       }
     ],
     "import/no-relative-parent-imports": "error",
-    "typescript/no-explicit-any": "error"
+    "typescript/no-explicit-any": "error",
+    "react/react-in-jsx-scope": "off",
+    "import/no-unassigned-import": [
+      "warn",
+      {
+        "allow": [
+          "**/*.css"
+        ]
+      }
+    ]
   },
   "ignorePatterns": [
     "**/dist/**",

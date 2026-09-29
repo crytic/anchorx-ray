@@ -126,6 +126,11 @@ describe("diff", () => {
     ]);
     expect(diffJson(1, 2)).toEqual([{ path: "(root)", before: 1, after: 2 }]);
     expect(diffJson({ a: [1] }, { a: [1] })).toEqual([]);
+    expect(diffJson(undefined, { a: { b: 1 }, c: [2] })).toEqual([
+      { path: "a.b", before: undefined, after: 1 },
+      { path: "c[0]", before: undefined, after: 2 },
+    ]);
+    expect(diffJson({ a: 1 }, undefined)).toEqual([{ path: "a", before: 1, after: undefined }]);
   });
 
   test("classifies added, removed, modified and unchanged accounts", () => {

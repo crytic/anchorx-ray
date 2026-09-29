@@ -9,3 +9,5 @@ onlyBuiltDependencies: []
 ignoredBuiltDependencies:
   - bufferutil
   - utf-8-validate
+  # Only validates its platform binary; vite 8 bundles with rolldown.
+  - esbuild

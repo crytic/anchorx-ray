@@ -85,6 +85,8 @@ export interface AccountNode {
   decoded?: Json;
   decodeError?: string;
   pda?: PdaInfo;
+  /** Instruction account names this address was passed as (e.g. `owner`, `depositor`). */
+  roles?: string[];
   /** Upgrade authority for upgradeable programs (null = immutable). */
   upgradeAuthority?: string | null;
   findings: Finding[];

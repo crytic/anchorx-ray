@@ -69,6 +69,18 @@ describe("buildModel on the recorded demo state", () => {
     expect(owner?.constrainedBy?.toSorted()).toEqual(["set_delegate", "withdraw"]);
   });
 
+  test("names wallets by their instruction roles and missing accounts by the referencing field", () => {
+    const wallets = model.accounts.filter((a) => a.kind === "wallet");
+    expect(wallets.map((w) => w.label).toSorted()).toEqual([
+      "admin",
+      "depositor · owner",
+      "owner · authority",
+    ]);
+    expect(model.accounts.find((a) => a.kind === "missing")?.label).toBe("Config.treasury");
+    const admin = wallets.find((w) => w.label === "admin");
+    expect(admin?.roles).toEqual(["admin"]);
+  });
+
   test("reports upgrade authorities and dangling references", () => {
     const vaultProgram = model.accounts.find((a) => a.address === VAULT_ID);
     expect(typeof vaultProgram?.upgradeAuthority).toBe("string");

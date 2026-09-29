@@ -83,6 +83,11 @@ export async function startValidator(
     String(rpcPort),
     "--faucet-port",
     String(rpcPort + 1001),
+    // Keep gossip/TPU ports clear of a default validator running on the same machine.
+    "--gossip-port",
+    String(rpcPort + 2),
+    "--dynamic-port-range",
+    `${rpcPort + 100}-${rpcPort + 200}`,
     ...programs.flatMap((p) => ["--upgradeable-program", p.id, p.so, p.upgradeAuthority]),
     ...writeAccountFiles(dir, accounts),
   ];

@@ -30,7 +30,16 @@ function isObject(value: Json | undefined): value is { [key: string]: Json } {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function childPairs(before: Json | undefined, after: Json | undefined, path: string) {
+/** An absent side diffs like an empty container, so added/removed data lists its leaves. */
+function emptyLike(value: Json | undefined, other: Json | undefined): Json | undefined {
+  if (value !== undefined) return value;
+  if (Array.isArray(other)) return [];
+  return isObject(other) ? {} : value;
+}
+
+function childPairs(left: Json | undefined, right: Json | undefined, path: string) {
+  const before = emptyLike(left, right);
+  const after = emptyLike(right, left);
   if (Array.isArray(before) && Array.isArray(after)) {
     const length = Math.max(before.length, after.length);
     return Array.from({ length }, (_, i) => [`${path}[${i}]`, before[i], after[i]] as const);

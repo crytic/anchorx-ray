@@ -1,12 +1,11 @@
+import type { Idl, IdlInstructionAccountItem } from "@anchor-lang/core";
 import {
   BorshAccountsCoder,
   BorshEventCoder,
   BorshInstructionCoder,
   LangErrorCode,
   LangErrorMessage,
-  type Idl,
-  type IdlInstructionAccountItem,
-} from "@anchor-lang/core";
+} from "./anchor.js";
 import { collectPubkeys, toJson, type PubkeyRef } from "./json.js";
 import type { Json } from "./types.js";
 import type { LoadedProgram } from "./workspace.js";
@@ -63,9 +62,9 @@ export class ProgramCodec {
   readonly id: string;
   readonly name: string;
   readonly idl: Idl;
-  private readonly accountCoder: BorshAccountsCoder;
-  private readonly ixCoder: BorshInstructionCoder;
-  private readonly eventCoder: BorshEventCoder;
+  private readonly accountCoder: InstanceType<typeof BorshAccountsCoder>;
+  private readonly ixCoder: InstanceType<typeof BorshInstructionCoder>;
+  private readonly eventCoder: InstanceType<typeof BorshEventCoder>;
   private readonly accountDiscs: { name: string; disc: Buffer }[];
   private readonly ixAccounts = new Map<string, FlatIxAccount[]>();
 

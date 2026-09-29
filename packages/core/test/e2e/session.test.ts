@@ -2,7 +2,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { AnchorProvider, BN, Program, Wallet } from "@anchor-lang/core";
 import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import {
   loadWorkspace,
@@ -14,6 +13,7 @@ import {
 } from "@anchorx-ray/core";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import {
+  anchor,
   exampleBuilt,
   exampleRoot,
   injectedAccounts,
@@ -28,6 +28,7 @@ import {
 } from "./scenario.js";
 import { hasValidator, startValidator, type Validator } from "./validator.js";
 
+const { AnchorProvider, BN, Program, Wallet } = anchor;
 const FIXTURE = fileURLToPath(new URL("../fixtures/demo-snapshot.json", import.meta.url));
 const ready = hasValidator() && exampleBuilt();
 

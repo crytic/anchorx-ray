@@ -8,6 +8,8 @@ const alias = {
 export default defineConfig({
   resolve: { alias },
   test: {
+    // @solana/web3.js v1 loads the deprecated `punycode` module through node-fetch.
+    execArgv: ["--disable-warning=DEP0040"],
     projects: [
       {
         resolve: { alias },

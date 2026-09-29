@@ -112,6 +112,10 @@ export class Session extends EventEmitter<{ event: [SessionEvent] }> {
     return this.rebuild();
   }
 
+  get watching(): boolean {
+    return this.subscriptions.length > 0;
+  }
+
   model(): XrayModel {
     return this.cachedModel ?? this.rebuild();
   }

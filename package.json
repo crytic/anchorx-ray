@@ -7,19 +7,22 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "pnpm -r --filter ./packages/* build",
+    "build": "pnpm --filter @anchorx-ray/web build && pnpm --filter anchorx-ray build",
     "typecheck": "pnpm -r --filter ./packages/* typecheck",
     "lint": "oxlint --deny-warnings packages",
     "format": "oxfmt packages",
     "format:check": "oxfmt --check packages",
     "test": "vitest run --project unit",
     "test:e2e": "vitest run --project e2e",
-    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test"
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test",
+    "demo": "tsx --disable-warning=DEP0040 packages/core/test/e2e/demo.ts"
   },
   "devDependencies": {
     "@types/node": "22.20.4",
     "oxfmt": "0.71.0",
     "oxlint": "1.86.0",
+    "tsdown": "0.23.0",
+    "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vitest": "5.0.2"
   }

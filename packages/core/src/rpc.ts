@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { utils } from "@anchor-lang/core";
+import { utils } from "./anchor.js";
 import {
   PublicKey,
   type AccountInfo,

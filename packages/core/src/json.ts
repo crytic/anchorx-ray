@@ -1,4 +1,4 @@
-import { BN } from "@anchor-lang/core";
+import { BN } from "./anchor.js";
 import { PublicKey } from "@solana/web3.js";
 import type { Json } from "./types.js";
 

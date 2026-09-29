@@ -3,6 +3,7 @@ export { CodecRegistry, ProgramCodec } from "./codec.js";
 export { diffAccount, diffJson, diffStates } from "./diff.js";
 export type { AccountDiff, FieldChange, StateDiff } from "./diff.js";
 export { collectPubkeys, toJson } from "./json.js";
+export { KNOWN_ADDRESSES } from "./names.js";
 export { collectTemplates, guessSeeds, resolveFromInstruction } from "./pda.js";
 export { fetchRecentTransactions, fetchState, fetchTransaction } from "./rpc.js";
 export { defaultWsUrl, Session } from "./session.js";

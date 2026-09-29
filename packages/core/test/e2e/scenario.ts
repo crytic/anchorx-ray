@@ -1,16 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  AnchorProvider,
-  BN,
-  BorshAccountsCoder,
-  Program,
-  Wallet,
-  type Idl,
-} from "@anchor-lang/core";
+// oxlint-disable-next-line import/default -- CommonJS: the default import is module.exports.
+import anchor, { type Idl } from "@anchor-lang/core";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, type Connection } from "@solana/web3.js";
 import type { AccountToLoad, ProgramToLoad } from "./validator.js";
+
+// CommonJS package: named ESM imports fail under plain Node (`pnpm demo`).
+export { anchor };
+// oxlint-disable-next-line import/no-named-as-default-member -- see above.
+const { AnchorProvider, BN, BorshAccountsCoder, Program, Wallet } = anchor;
+type Program = InstanceType<typeof Program>;
 
 const EXAMPLE = fileURLToPath(new URL("../../../../examples/xray-demo", import.meta.url));
 const IDL_DIR = path.join(EXAMPLE, "target", "idl");

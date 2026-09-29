@@ -1,0 +1,32 @@
+{
+  "name": "anchorx-ray",
+  "version": "0.2.0",
+  "description": "Inspect the accounts, PDAs and transactions of Anchor programs on a live cluster",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/crytic/anchorx-ray.git"
+  },
+  "bin": {
+    "anchorx-ray": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "tsdown && node scripts/copy-web.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@anchor-lang/core": "1.2.0",
+    "@solana/web3.js": "1.99.0",
+    "smol-toml": "1.9.0"
+  },
+  "devDependencies": {
+    "@anchorx-ray/core": "workspace:*"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
