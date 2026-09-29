@@ -52,6 +52,27 @@ describe("decodeTransaction", () => {
     });
   });
 
+  test("blames the innermost program when a CPI fails", () => {
+    const via = snapshot.transactions.find(
+      (t) => decodeTransaction(t, codecs).entry.instructions[0]?.name === "deposit_via_registry",
+    ) as RawTransaction;
+    const registry = via.accountKeys[via.instructions[0]?.programIdIndex ?? 0]?.pubkey;
+    const failed: RawTransaction = {
+      ...via,
+      err: { InstructionError: [0, { Custom: 6001 }] },
+      logs: [
+        `Program ${registry} invoke [1]`,
+        `Program ${VAULT_ID} invoke [2]`,
+        `Program ${VAULT_ID} failed: custom program error: 0x1771`,
+        `Program ${registry} failed: custom program error: 0x1771`,
+      ],
+    };
+    expect(decodeTransaction(failed, codecs).entry.error).toMatchObject({
+      program: VAULT_ID,
+      name: "VaultFrozen",
+    });
+  });
+
   test("records lamport movements", () => {
     const deposit = first("deposit");
     expect(deposit?.balanceChanges.length).toBeGreaterThan(0);

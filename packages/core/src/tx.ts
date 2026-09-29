@@ -131,9 +131,12 @@ function eventFromLine(
   return event && program ? [{ program, name: event.name, data: event.json, via: "log" }] : [];
 }
 
-/** The program named by the last `failed` log line: the innermost failing CPI. */
+/**
+ * The program named by the first `failed` log line: the innermost failing CPI
+ * logs first, then each caller up the stack logs the same failure again.
+ */
 function failingProgram(logs: string[]): string | undefined {
-  const failed = logs.findLast((l) => / failed: /.test(l));
+  const failed = logs.find((l) => / failed: /.test(l));
   return failed ? /^Program (\w+) failed/.exec(failed)?.[1] : undefined;
 }
 

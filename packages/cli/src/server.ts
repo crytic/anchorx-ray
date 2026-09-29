@@ -115,7 +115,13 @@ function routes(options: ServerOptions): Record<string, Handler> {
 
 function serveStatic(webDir: string, url: URL, res: http.ServerResponse): void {
   const root = path.resolve(webDir);
-  const requested = path.resolve(root, `.${decodeURIComponent(url.pathname)}`);
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(url.pathname);
+  } catch {
+    throw new HttpError(400, "Malformed URL encoding");
+  }
+  const requested = path.resolve(root, `.${pathname}`);
   if (requested !== root && !requested.startsWith(root + path.sep))
     throw new HttpError(403, "Forbidden");
   const isFile = fs.existsSync(requested) && fs.statSync(requested).isFile();

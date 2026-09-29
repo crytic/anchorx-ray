@@ -32,10 +32,20 @@ function toBn(value: unknown): BN | undefined {
   return undefined;
 }
 
+/** Whether `bn` is representable in `bits` bits, signed or unsigned. */
+function fits(bn: BN, bits: number, signed: boolean): boolean {
+  if (!signed) return !bn.isNeg() && bn.bitLength() <= bits;
+  // Two's complement range: -2^(bits-1) .. 2^(bits-1) - 1.
+  const magnitude = bn.isNeg() ? bn.neg().subn(1) : bn;
+  return magnitude.bitLength() < bits;
+}
+
 function intBytes(value: unknown, type: string, width: number): SeedBytes | undefined {
   const bn = toBn(value);
-  if (!bn) return undefined;
-  const encoded = type.startsWith("i") ? bn.toTwos(width * 8) : bn;
+  const signed = type.startsWith("i");
+  // Guessed values can come from any instruction; skip ones that cannot be this type.
+  if (!bn || !fits(bn, width * 8, signed)) return undefined;
+  const encoded = signed ? bn.toTwos(width * 8) : bn;
   return { bytes: encoded.toArrayLike(Buffer, "le", width), display: bn.toString(10) };
 }
 

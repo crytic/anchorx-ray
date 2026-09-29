@@ -29,7 +29,12 @@ export function snapshotDir(root: string): string {
   return path.join(root, ".anchorx-ray", "snapshots");
 }
 
+/** Name that `diff` reserves for the current cluster state. */
+export const LIVE = "live";
+
 function fileFor(root: string, name: string): string {
+  if (name === LIVE)
+    throw new Error(`"${LIVE}" is reserved for the current state; pick another name`);
   if (!NAME.test(name)) {
     throw new Error(
       `Invalid snapshot name "${name}": use letters, digits, ".", "_" or "-" (max 64 chars)`,

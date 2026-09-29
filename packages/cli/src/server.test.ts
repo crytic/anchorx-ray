@@ -110,6 +110,7 @@ describe("UI server", () => {
     expect((await get("/")).body).toContain("<title>ui</title>");
     expect((await get("/some/client/route")).body).toContain("<title>ui</title>");
     expect((await get("/..%2fsecret.txt")).status).toBe(403);
+    expect((await get("/%E0%A4%A")).status).toBe(400);
     expect((await get("/api/nope")).status).toBe(404);
     expect(
       (await request(port, { method: "DELETE", path: "/", headers: { host: `127.0.0.1:${port}` } }))

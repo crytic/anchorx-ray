@@ -5,6 +5,8 @@ import { when } from "./format.js";
 
 interface Props {
   snapshots: SnapshotSummary[];
+  /** Bumped on live changes so a diff against "live" refetches. */
+  liveTick: number;
   offline: boolean;
   onSaved: () => void;
 }
@@ -133,7 +135,16 @@ interface Selection {
   onTo: (v: string) => void;
 }
 
-function Comparison({ selection, version }: { selection: Selection; version: number }) {
+/** Changes whenever either side of the comparison may have new content. */
+function diffKey(selection: Selection, snapshots: SnapshotSummary[], liveTick: number): string {
+  const side = (name: string | undefined) =>
+    name === LIVE
+      ? `live#${liveTick}`
+      : `${name}@${snapshots.find((s) => s.name === name)?.createdAt}`;
+  return `${side(selection.from)}→${side(selection.to)}`;
+}
+
+function Comparison({ selection, version }: { selection: Selection; version: string }) {
   const { from, to, options } = selection;
   if (!from) return <div className="empty">Save a snapshot to compare states.</div>;
   return (
@@ -143,7 +154,7 @@ function Comparison({ selection, version }: { selection: Selection; version: num
         <Picker value={from} options={options} onChange={selection.onFrom} />→
         <Picker value={to} options={options} onChange={selection.onTo} />
       </div>
-      <DiffPanel key={`${from}→${to}#${version}`} from={from} to={to} />
+      <DiffPanel key={version} from={from} to={to} />
     </>
   );
 }
@@ -168,7 +179,7 @@ function selectionOf(
   };
 }
 
-export function SnapshotsView({ snapshots, offline, onSaved }: Props) {
+export function SnapshotsView({ snapshots, liveTick, offline, onSaved }: Props) {
   const [picked, setPicked] = useState<Picked>({});
   const [error, setError] = useState<string>();
   const selection = selectionOf(snapshots, offline, picked, setPicked);
@@ -198,7 +209,7 @@ export function SnapshotsView({ snapshots, offline, onSaved }: Props) {
       </div>
       <div className="detail">
         {error && <div className="finding warning">{error}</div>}
-        <Comparison selection={selection} version={snapshots.length} />
+        <Comparison selection={selection} version={diffKey(selection, snapshots, liveTick)} />
       </div>
     </div>
   );

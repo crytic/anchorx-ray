@@ -14,6 +14,7 @@ import {
   loadSnapshot,
   loadWorkspace,
   parseIdl,
+  resolveFromInstruction,
   saveSnapshot,
   CodecRegistry,
   SNAPSHOT_FORMAT,
@@ -55,6 +56,13 @@ describe("seed serialization", () => {
     expect(seedBytesFor(-1, "i16")?.bytes.toString("hex")).toBe("ffff");
     expect(seedBytesFor("258", "u32")?.bytes.toString("hex")).toBe("02010000");
     expect(seedBytesFor(1.5, "u8")).toBeUndefined();
+    // Values guessed from other instructions may not fit the seed's type.
+    expect(seedBytesFor(new BN(1000), "u8")).toBeUndefined();
+    expect(seedBytesFor(-1, "u64")).toBeUndefined();
+    expect(seedBytesFor(127, "i8")?.bytes.toString("hex")).toBe("7f");
+    expect(seedBytesFor(-128, "i8")?.bytes.toString("hex")).toBe("80");
+    expect(seedBytesFor(128, "i8")).toBeUndefined();
+    expect(seedBytesFor(-129, "i8")).toBeUndefined();
   });
 
   test("encodes keys, strings, bools and bytes", () => {
@@ -71,6 +79,41 @@ describe("seed serialization", () => {
     expect(typeAtPath(idl, "Vault", ["vault_id"])).toBe("u64");
     expect(typeAtPath(idl, "Vault", ["missing"])).toBeUndefined();
     expect(typeAtPath(idl, "Vault", ["owner", "deeper"])).toBeUndefined();
+  });
+});
+
+describe("PDA resolution", () => {
+  test("resolves seeds relative to the composite struct holding the PDA", () => {
+    const codecs = new CodecRegistry(fixturePrograms());
+    const codec = codecs.get(KEY.toBase58());
+    if (!codec) throw new Error("vault codec missing");
+    const innerOwner = PublicKey.unique();
+    const [expected] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), innerOwner.toBuffer()],
+      KEY,
+    );
+    const template = {
+      declaringProgram: KEY.toBase58(),
+      instruction: "nested",
+      account: "inner.vault",
+      seeds: [
+        { kind: "const" as const, value: [...Buffer.from("vault")] },
+        { kind: "account" as const, path: "owner" },
+      ],
+    };
+    const scope = {
+      accounts: new Map([
+        ["inner.vault", expected.toBase58()],
+        ["inner.owner", innerOwner.toBase58()],
+        ["owner", PublicKey.unique().toBase58()],
+      ]),
+      args: {},
+    };
+    const matches = resolveFromInstruction([template], scope, {
+      codec,
+      accountData: () => undefined,
+    });
+    expect(matches.map((m) => m.address)).toEqual([expected.toBase58()]);
   });
 });
 

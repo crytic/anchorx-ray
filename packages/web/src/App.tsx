@@ -107,6 +107,7 @@ export function App() {
     snapshots: (
       <SnapshotsView
         snapshots={server.snapshots}
+        liveTick={server.changeTick}
         offline={Boolean(server.status?.snapshot)}
         onSaved={server.reloadSnapshots}
       />

@@ -40,7 +40,12 @@ export function toRawAccount(address: string, info: AccountInfo<Buffer>): RawAcc
   return account;
 }
 
-async function fetchMany(connection: Connection, addresses: string[], commitment: Commitment) {
+/** Fetches accounts in RPC-sized batches, splitting found from missing addresses. */
+export async function fetchMany(
+  connection: Connection,
+  addresses: string[],
+  commitment: Commitment = "confirmed",
+) {
   const found: RawAccount[] = [];
   const missing: string[] = [];
   for (let i = 0; i < addresses.length; i += BATCH) {

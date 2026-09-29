@@ -3,8 +3,15 @@ import { Connection, PublicKey, type Commitment } from "@solana/web3.js";
 import { buildModel, referencedAddresses } from "./analyze.js";
 import { CodecRegistry } from "./codec.js";
 import { diffAccount, diffStates, type AccountDiff, type StateDiff } from "./diff.js";
-import { fetchRecentTransactions, fetchState, fetchTransaction, toRawAccount } from "./rpc.js";
 import {
+  fetchMany,
+  fetchRecentTransactions,
+  fetchState,
+  fetchTransaction,
+  toRawAccount,
+} from "./rpc.js";
+import {
+  LIVE,
   listSnapshots,
   loadSnapshot,
   saveSnapshot,
@@ -77,6 +84,8 @@ export class Session extends EventEmitter<{ event: [SessionEvent] }> {
   private cachedModel: XrayModel | undefined;
   private subscriptions: { account: number; logs: number }[] = [];
   private rebuildTimer: NodeJS.Timeout | undefined;
+  private pending: { account: RawAccount; programId: string; slot: number }[] | undefined;
+  private fetchingReferences = false;
 
   constructor(options: SessionOptions) {
     super();
@@ -95,12 +104,21 @@ export class Session extends EventEmitter<{ event: [SessionEvent] }> {
   /** Re-fetches all state and recent transactions from the cluster. */
   async refresh(): Promise<XrayModel> {
     const ids = this.codecs.ids();
-    const [state, txs] = await Promise.all([
-      fetchState(this.connection, this.codecs),
-      fetchRecentTransactions(this.connection, ids, this.options.txLimit),
-    ]);
-    this.state = state;
-    for (const raw of txs) this.addTransaction(raw);
+    // Notifications that land while fetching are replayed onto the new state.
+    this.pending = [];
+    try {
+      const [state, txs] = await Promise.all([
+        fetchState(this.connection, this.codecs),
+        fetchRecentTransactions(this.connection, ids, this.options.txLimit),
+      ]);
+      this.state = state;
+      for (const update of this.pending.filter((u) => u.slot > state.slot)) {
+        this.applyAccount(update.account, update.programId);
+      }
+      for (const raw of txs) this.addTransaction(raw);
+    } finally {
+      this.pending = undefined;
+    }
     return this.rebuild();
   }
 
@@ -205,6 +223,7 @@ export class Session extends EventEmitter<{ event: [SessionEvent] }> {
   }
 
   private onAccount(next: RawAccount, programId: string, slot: number): void {
+    this.pending?.push({ account: next, programId, slot });
     const diff = this.applyAccount(next, programId);
     this.state.slot = Math.max(this.state.slot, slot);
     if (!diff) return;
@@ -227,11 +246,7 @@ export class Session extends EventEmitter<{ event: [SessionEvent] }> {
           return;
         }
       } catch (error) {
-        this.emit("event", {
-          type: "status",
-          watching: true,
-          error: `getTransaction ${signature}: ${(error as Error).message}`,
-        });
+        this.reportError(`getTransaction ${signature}`, error);
       }
       await sleep(250 * (attempt + 1));
     }
@@ -242,31 +257,36 @@ export class Session extends EventEmitter<{ event: [SessionEvent] }> {
     this.rebuildTimer = setTimeout(() => void this.rebuildWithReferences(), REBUILD_DELAY_MS);
   }
 
+  private reportError(context: string, error: unknown): void {
+    const message = `${context}: ${(error as Error).message}`;
+    this.emit("event", { type: "status", watching: this.watching, error: message });
+  }
+
   /** Fetches newly referenced accounts (e.g. a new owner wallet) before rebuilding. */
   private async rebuildWithReferences(): Promise<void> {
-    const known = new Set([...this.state.referenced.map((a) => a.address), ...this.state.missing]);
-    const wanted = referencedAddresses(this.state.accounts, this.codecs).filter(
-      (a) => !known.has(a),
-    );
+    if (this.fetchingReferences) return this.scheduleRebuild();
+    this.fetchingReferences = true;
     try {
-      if (wanted.length > 0) {
-        const infos = await this.connection.getMultipleAccountsInfo(
-          wanted.map((a) => new PublicKey(a)),
-        );
-        wanted.forEach((address, i) => {
-          const info = infos[i];
-          if (info) this.state.referenced.push(toRawAccount(address, info));
-          else this.state.missing.push(address);
-        });
-      }
+      const known = new Set([
+        ...this.state.referenced.map((a) => a.address),
+        ...this.state.missing,
+      ]);
+      const wanted = referencedAddresses(this.state.accounts, this.codecs).filter(
+        (a) => !known.has(a),
+      );
+      const { found, missing } = await fetchMany(this.connection, wanted);
+      this.state.referenced.push(...found);
+      this.state.missing.push(...missing);
     } catch (error) {
-      this.emit("event", {
-        type: "status",
-        watching: true,
-        error: `refresh references: ${(error as Error).message}`,
-      });
+      this.reportError("refresh references", error);
+    } finally {
+      this.fetchingReferences = false;
     }
-    this.rebuild();
+    try {
+      this.rebuild();
+    } catch (error) {
+      this.reportError("rebuild model", error);
+    }
   }
 
   snapshots(): SnapshotSummary[] {
@@ -296,7 +316,7 @@ export class Session extends EventEmitter<{ event: [SessionEvent] }> {
   /** Diffs two snapshots by name; `live` stands for the current state. */
   diff(from: string, to: string): StateDiff {
     const stateOf = (name: string) =>
-      name === "live" ? this.state : loadSnapshot(this.root, name).state;
+      name === LIVE ? this.state : loadSnapshot(this.root, name).state;
     return diffStates(stateOf(from), stateOf(to), this.codecs);
   }
 }

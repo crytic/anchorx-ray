@@ -93,14 +93,25 @@ function toResolved(c: Candidate): ResolvedSeed {
   return seed;
 }
 
+/**
+ * Resolves an account name the way Anchor does: relative to the composite
+ * struct that holds the PDA first (`inner.authority`), then from the top level.
+ */
+function lookupAccount(scope: InstructionScope, template: SeedTemplate, name: string) {
+  const parent = template.account.split(".").slice(0, -1);
+  const nested = parent.length > 0 ? scope.accounts.get([...parent, name].join(".")) : undefined;
+  return nested ?? scope.accounts.get(name);
+}
+
 /** Values of account-seed `path` (`name` or `name.field...`) inside an instruction scope. */
 function scopeAccountSeed(
   seed: Extract<IdlSeed, { kind: "account" }>,
+  template: SeedTemplate,
   scope: InstructionScope,
   ctx: SeedContext,
 ): SeedBytes | undefined {
   const [head, ...rest] = seed.path.split(".");
-  const address = head === undefined ? undefined : scope.accounts.get(head);
+  const address = head === undefined ? undefined : lookupAccount(scope, template, head);
   if (!address) return undefined;
   if (rest.length === 0) return seedBytesFor(new PublicKey(address), "pubkey");
   const data = ctx.accountData(address);
@@ -124,7 +135,7 @@ function scopeSeed(
     const value = seedBytesFor(getPath(scope.args, seed.path.split(".")), type);
     return value && { ...value, kind: "arg", path: seed.path };
   }
-  const value = scopeAccountSeed(seed, scope, ctx);
+  const value = scopeAccountSeed(seed, template, scope, ctx);
   return value && { ...value, kind: "account", path: seed.path };
 }
 
