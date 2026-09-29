@@ -84,6 +84,32 @@ function badRequest<T>(fn: () => T): T {
   }
 }
 
+const MAX_LOAD = 2000;
+
+const isAddressList = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.every((a) => typeof a === "string");
+
+const isCount = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v > 0 && v <= MAX_LOAD;
+
+const isTypeName = (v: unknown): v is string | null => v === null || typeof v === "string";
+
+/** `{ program, typeName, count }` loads more of one account type; `{ addresses }` loads keys. */
+function loadAccounts(session: Session, body: Record<string, unknown>) {
+  const { program, typeName, count, addresses } = body;
+  if (isAddressList(addresses)) {
+    if (addresses.length > MAX_LOAD) throw new HttpError(400, `At most ${MAX_LOAD} addresses`);
+    return session.loadAddresses(addresses);
+  }
+  if (typeof program !== "string" || !isTypeName(typeName) || !isCount(count)) {
+    throw new HttpError(
+      400,
+      `Expected { program, typeName, count <= ${MAX_LOAD} } or { addresses }`,
+    );
+  }
+  return session.loadMore(program, typeName, count);
+}
+
 function routes(options: ServerOptions): Record<string, Handler> {
   const { session, status } = options;
   const live = () => {
@@ -104,6 +130,10 @@ function routes(options: ServerOptions): Record<string, Handler> {
     "POST /api/refresh": async () => {
       live();
       return session.refresh();
+    },
+    "POST /api/load": async (req) => {
+      live();
+      return loadAccounts(session, await readJson(req));
     },
     "POST /api/snapshots": async (req) => {
       const { name } = await readJson(req);

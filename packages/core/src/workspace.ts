@@ -25,6 +25,10 @@ export interface WorkspaceOptions {
   idlPaths?: string[];
   /** Overrides `[provider] cluster` from Anchor.toml. */
   cluster?: string;
+  /** Only load these programs (by IDL name or program id). */
+  include?: string[];
+  /** Skip these programs (by IDL name or program id). */
+  exclude?: string[];
 }
 
 const CLUSTER_URLS: Record<string, string> = {
@@ -158,6 +162,31 @@ function loadPrograms(files: string[], ids: Record<string, string>, warnings: st
   return programs;
 }
 
+function matcher(programs: LoadedProgram[], selectors: string[], flag: string) {
+  const known = new Set(programs.flatMap((p) => [p.name, p.id]));
+  const unknown = selectors.filter((s) => !known.has(s));
+  if (unknown.length > 0) {
+    const available = programs.map((p) => p.name).join(", ");
+    throw new Error(`${flag}: unknown program ${unknown.join(", ")}. Available: ${available}`);
+  }
+  const wanted = new Set(selectors);
+  return (p: LoadedProgram) => wanted.has(p.name) || wanted.has(p.id);
+}
+
+/** Applies --include/--exclude; both match an IDL name or a program id. */
+export function filterPrograms(
+  programs: LoadedProgram[],
+  include: string[] = [],
+  exclude: string[] = [],
+): LoadedProgram[] {
+  const included = include.length > 0 ? matcher(programs, include, "--include") : () => true;
+  const excluded = exclude.length > 0 ? matcher(programs, exclude, "--exclude") : () => false;
+  const selected = programs.filter((p) => included(p) && !excluded(p));
+  if (selected.length === 0)
+    throw new Error("No program left to inspect after --include/--exclude.");
+  return selected;
+}
+
 /**
  * Resolves the programs to inspect: IDLs from `target/idl` (or explicit
  * paths), with program ids taken from Anchor.toml for the active cluster when
@@ -170,10 +199,11 @@ export function loadWorkspace(options: WorkspaceOptions): Workspace {
   const rpcUrl = clusterToRpcUrl(cluster);
   const clusterKey = /^https?:/.test(cluster) ? "localnet" : cluster.toLowerCase();
   const warnings: string[] = [];
-  const programs = loadPrograms(
+  const loaded = loadPrograms(
     idlFiles(root, options.idlPaths),
     toml?.programs[clusterKey] ?? {},
     warnings,
   );
+  const programs = filterPrograms(loaded, options.include, options.exclude);
   return { root, cluster, rpcUrl, programs, warnings };
 }

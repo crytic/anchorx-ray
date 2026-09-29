@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "pnpm --filter @anchorx-ray/web build && pnpm --filter anchorx-ray build",
-    "typecheck": "pnpm -r --filter ./packages/* typecheck",
+    "typecheck": "pnpm -r typecheck",
     "lint": "oxlint --deny-warnings packages",
     "format": "oxfmt packages",
     "format:check": "oxfmt --check packages",

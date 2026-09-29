@@ -8,10 +8,13 @@ export interface CliOptions {
   positionals: string[];
   workspace: string;
   idl: string[];
+  include: string[];
+  exclude: string[];
   cluster?: string;
   rpc?: string;
   ws?: string;
   txLimit: number;
+  maxAccounts: number;
   port: number;
   open: boolean;
   watch: boolean;
@@ -38,11 +41,15 @@ Commands:
 Options:
   -w, --workspace <dir>  Anchor workspace root (default: current directory)
       --idl <file>       IDL file to load; repeatable (default: target/idl/*.json)
+      --include <names>  Only inspect these programs (names or ids, comma-separated or repeated)
+      --exclude <names>  Skip these programs
       --cluster <name>   localnet | devnet | testnet | mainnet | <url>
                          (default: [provider] cluster in Anchor.toml)
       --rpc <url>        RPC URL; overrides --cluster
       --ws <url>         Websocket URL (default: RPC port + 1)
       --tx-limit <n>     Recent transactions to load (default: 100)
+      --max-accounts <n> Program accounts loaded with full data; the rest are listed and
+                         can be loaded from the UI (default: 500)
   -p, --port <n>         Web UI port (default: 3000)
       --no-open          Do not open a browser
       --no-watch         Do not subscribe to live updates
@@ -59,6 +66,14 @@ function positiveInt(value: string | undefined, name: string, fallback: number):
   if (!Number.isInteger(n) || n < 0)
     throw new Error(`--${name} must be a non-negative integer, got "${value}"`);
   return n;
+}
+
+/** `--include a,b --include c` → ["a", "b", "c"]. */
+function splitList(values: string[] | undefined): string[] {
+  return (values ?? [])
+    .flatMap((v) => v.split(","))
+    .map((v) => v.trim())
+    .filter(Boolean);
 }
 
 function commandOf(positionals: string[]): { command: Command; rest: string[] } {
@@ -96,10 +111,13 @@ export function parseCli(argv: string[]): ParsedCli {
     options: {
       workspace: { type: "string", short: "w" },
       idl: { type: "string", multiple: true },
+      include: { type: "string", multiple: true },
+      exclude: { type: "string", multiple: true },
       cluster: { type: "string" },
       rpc: { type: "string" },
       ws: { type: "string" },
       "tx-limit": { type: "string" },
+      "max-accounts": { type: "string" },
       port: { type: "string", short: "p" },
       open: { type: "boolean", default: true },
       watch: { type: "boolean", default: true },
@@ -119,7 +137,10 @@ export function parseCli(argv: string[]): ParsedCli {
     positionals: rest,
     workspace: values.workspace ?? process.cwd(),
     idl: values.idl ?? [],
+    include: splitList(values.include),
+    exclude: splitList(values.exclude),
     txLimit: positiveInt(values["tx-limit"], "tx-limit", 100),
+    maxAccounts: positiveInt(values["max-accounts"], "max-accounts", 500),
     port: positiveInt(values.port, "port", 3000),
     open: values.open,
     watch: values.watch,

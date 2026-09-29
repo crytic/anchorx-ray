@@ -8,6 +8,7 @@ import {
   type VersionedTransactionResponse,
 } from "@solana/web3.js";
 import { referencedAddresses } from "./analyze.js";
+import { scanCatalog, selectInitial } from "./catalog.js";
 import type { CodecRegistry } from "./codec.js";
 import { UPGRADEABLE_LOADER } from "./known.js";
 import type { RawTransaction, RawTxInstruction } from "./tx.js";
@@ -63,23 +64,37 @@ export async function fetchMany(
   return { found, missing };
 }
 
+export interface FetchOptions {
+  commitment?: Commitment;
+  /** Cap on program-owned accounts fetched with full data; the rest stay in the catalog. */
+  maxAccounts?: number;
+}
+
+export const DEFAULT_MAX_ACCOUNTS = 500;
+
 /**
- * Fetches the program accounts, every account they own, and the accounts
- * their data references (plus ProgramData of referenced programs).
+ * Fetches the program accounts, a capped set of the accounts they own (all
+ * of them are listed in the catalog), and the accounts their data references.
  */
 export async function fetchState(
   connection: Connection,
   codecs: CodecRegistry,
-  commitment: Commitment = "confirmed",
+  options: FetchOptions = {},
 ): Promise<RawState> {
+  const commitment = options.commitment ?? "confirmed";
   const slot = await connection.getSlot(commitment);
   const programs = await fetchMany(connection, codecs.ids(), commitment);
-  const accounts: RawAccount[] = [...programs.found];
-  for (const id of codecs.ids()) {
-    const owned = await connection.getProgramAccounts(new PublicKey(id), { commitment });
-    for (const { pubkey, account } of owned)
-      accounts.push(toRawAccount(pubkey.toBase58(), account));
-  }
+  const scanned = await scanCatalog(connection, codecs, commitment);
+  const chosen = selectInitial(scanned, options.maxAccounts ?? DEFAULT_MAX_ACCOUNTS);
+  const owned = await fetchMany(
+    connection,
+    chosen.map((e) => e.address),
+    commitment,
+  );
+  // Accounts closed between the scan and the fetch are dropped from the catalog.
+  const gone = new Set(owned.missing);
+  const catalog = gone.size > 0 ? scanned.filter((e) => !gone.has(e.address)) : scanned;
+  const accounts = programs.found.concat(owned.found);
   const refs = await fetchMany(connection, referencedAddresses(accounts, codecs), commitment);
   // ProgramData accounts of referenced programs are one more hop away.
   const next = await fetchMany(connection, referencedAddresses(refs.found, codecs), commitment);
@@ -87,8 +102,9 @@ export async function fetchState(
     slot,
     fetchedAt: new Date().toISOString(),
     accounts,
-    referenced: [...refs.found, ...next.found],
-    missing: [...programs.missing, ...refs.missing, ...next.missing],
+    referenced: refs.found.concat(next.found),
+    missing: programs.missing.concat(refs.missing, next.missing),
+    catalog,
   };
 }
 

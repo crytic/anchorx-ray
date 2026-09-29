@@ -5,6 +5,7 @@ import { BN } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
 import {
   clusterToRpcUrl,
+  filterPrograms,
   collectPubkeys,
   seedBytesFor,
   toJson,
@@ -118,6 +119,18 @@ describe("PDA resolution", () => {
 });
 
 describe("workspace", () => {
+  test("filters programs by name or id", () => {
+    const programs = fixturePrograms();
+    const names = (list: typeof programs) => list.map((p) => p.name);
+    expect(names(filterPrograms(programs, ["xray_vault"]))).toEqual(["xray_vault"]);
+    expect(names(filterPrograms(programs, [], [KEY.toBase58()]))).toEqual(["xray_registry"]);
+    expect(names(filterPrograms(programs))).toEqual(["xray_registry", "xray_vault"]);
+    expect(() => filterPrograms(programs, ["nope"])).toThrow(/--include: unknown program nope/);
+    expect(() => filterPrograms(programs, [], ["xray_vault", "xray_registry"])).toThrow(
+      /No program left/,
+    );
+  });
+
   test("rejects legacy and non-IDL JSON with actionable messages", () => {
     expect(() => parseIdl({ version: "0.1.0", name: "old", instructions: [] }, "old.json")).toThrow(
       /anchor idl convert/,

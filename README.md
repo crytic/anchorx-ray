@@ -59,16 +59,24 @@ Commands:
 Options:
   -w, --workspace <dir>  Anchor workspace root (default: current directory)
       --idl <file>       IDL file to load; repeatable (default: target/idl/*.json)
+      --include <names>  Only inspect these programs (names or ids, comma-separated or repeated)
+      --exclude <names>  Skip these programs
       --cluster <name>   localnet | devnet | testnet | mainnet | <url>
+                         (default: [provider] cluster in Anchor.toml)
       --rpc <url>        RPC URL; overrides --cluster
       --ws <url>         Websocket URL (default: RPC port + 1)
       --tx-limit <n>     Recent transactions to load (default: 100)
+      --max-accounts <n> Program accounts loaded with full data; the rest are listed and
+                         can be loaded from the UI (default: 500)
   -p, --port <n>         Web UI port (default: 3000)
       --no-open          Do not open a browser
       --no-watch         Do not subscribe to live updates
       --snapshot <name>  ui/scan/timeline: read a saved snapshot instead of the cluster
   -o, --out <file>       scan: write JSON to a file instead of stdout
       --json             timeline/snapshots/diff: print JSON
+  -h, --help             Show this help
+  -v, --version          Show the version
+
 ```
 
 A typical test loop:
@@ -82,6 +90,23 @@ anchorx-ray diff before          # what the tests changed, account by account
 Snapshots are JSON files under `.anchorx-ray/snapshots/` in the workspace. They hold raw
 account data and transactions, so `--snapshot <name>` can reopen one without a cluster, for
 example to share a failing state with a teammate.
+
+### Large programs
+
+anchorx-ray lists every account your programs own but reads only the first 8 bytes of each
+(the discriminator), so a program with hundreds of thousands of accounts stays cheap to scan.
+Full data is fetched for `--max-accounts` of them, picked round-robin across account types so
+a rare type is never crowded out by a common one. The sidebar shows loaded/total per type,
+with a button to load more. Pasting an unloaded address into the search box offers to load it.
+
+The canvas folds a type with more than 24 accounts into a stack node, keeping the ones with
+findings, the selected account and recently changed accounts visible. Click a stack to expand
+it. Edges into a stack are merged and labeled with their count.
+
+`--include`/`--exclude` restrict the scan to some programs of the workspace, by name or id.
+
+Listing uses `getProgramAccounts`. Some public RPC providers restrict or disable it; use a
+provider that allows it or a local validator.
 
 ## How it works
 

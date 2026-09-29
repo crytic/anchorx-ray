@@ -2,8 +2,21 @@ import { PublicKey } from "@solana/web3.js";
 
 export { KNOWN_ADDRESSES, SYSTEM_PROGRAM, SYSVAR_OWNER, UPGRADEABLE_LOADER } from "./names.js";
 
+// Point decompression is slow in JS and the same addresses are checked on every rebuild.
+const curveCache = new Map<string, boolean>();
+const CURVE_CACHE_LIMIT = 200_000;
+
 export function isOnCurve(address: string): boolean {
-  return PublicKey.isOnCurve(new PublicKey(address).toBytes());
+  const cached = curveCache.get(address);
+  if (cached !== undefined) return cached;
+  if (curveCache.size >= CURVE_CACHE_LIMIT) curveCache.clear();
+  const onCurve = PublicKey.isOnCurve(new PublicKey(address).toBytes());
+  curveCache.set(address, onCurve);
+  return onCurve;
+}
+
+export function isOnCurveBytes(bytes: Uint8Array): boolean {
+  return PublicKey.isOnCurve(bytes);
 }
 
 /** Reads the ProgramData address out of an upgradeable-loader Program account. */

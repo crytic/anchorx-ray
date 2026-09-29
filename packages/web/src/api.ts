@@ -64,6 +64,9 @@ export const api = {
   diff: (from: string, to: string) =>
     request<StateDiff>(`/api/diff?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   refresh: () => post<XrayModel>("/api/refresh"),
+  loadMore: (program: string, typeName: string | null, count: number) =>
+    post<XrayModel>("/api/load", { program, typeName, count }),
+  loadAddresses: (addresses: string[]) => post<XrayModel>("/api/load", { addresses }),
 };
 
 /** Subscribes to the server's event stream; returns an unsubscribe function. */

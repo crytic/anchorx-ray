@@ -41,6 +41,10 @@ describe("parseCli", () => {
       watch: false,
       port: 0,
     });
+    expect(run(["--include", "a,b", "--include", "c", "--exclude", "d"])).toMatchObject({
+      include: ["a", "b", "c"],
+      exclude: ["d"],
+    });
     expect(run(["scan", "--rpc", "http://x", "-o", "out.json"])).toMatchObject({
       rpc: "http://x",
       out: "out.json",

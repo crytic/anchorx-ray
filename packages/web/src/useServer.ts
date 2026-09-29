@@ -26,6 +26,8 @@ export interface ServerState {
   dismissError: () => void;
   refresh: () => void;
   reloadSnapshots: () => void;
+  loadMore: (program: string, typeName: string | null, count: number) => void;
+  loadAddress: (address: string) => void;
 }
 
 function upsert(list: TimelineItem[], item: TimelineItem): TimelineItem[] {
@@ -91,6 +93,25 @@ export function useServer(): ServerState {
       .finally(() => setBusy(false));
   }, [fail, loadTimeline]);
 
+  const withBusy = useCallback(
+    (work: () => Promise<XrayModel>) => {
+      setBusy(true);
+      work()
+        .then(setModel, fail)
+        .finally(() => setBusy(false));
+    },
+    [fail],
+  );
+  const loadMore = useCallback(
+    (program: string, typeName: string | null, count: number) =>
+      withBusy(() => api.loadMore(program, typeName, count)),
+    [withBusy],
+  );
+  const loadAddress = useCallback(
+    (address: string) => withBusy(() => api.loadAddresses([address])),
+    [withBusy],
+  );
+
   return {
     status,
     model,
@@ -105,5 +126,7 @@ export function useServer(): ServerState {
     dismissError: () => setError(undefined),
     refresh,
     reloadSnapshots,
+    loadMore,
+    loadAddress,
   };
 }

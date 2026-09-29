@@ -148,6 +148,8 @@ async function run(options: CliOptions): Promise<void> {
   const workspace = loadWorkspace({
     root: options.workspace,
     idlPaths: options.idl,
+    include: options.include,
+    exclude: options.exclude,
     ...(options.cluster ? { cluster: options.cluster } : {}),
   });
   for (const message of workspace.warnings) warn(message);
@@ -156,6 +158,7 @@ async function run(options: CliOptions): Promise<void> {
     workspace,
     rpcUrl,
     txLimit: options.txLimit,
+    maxAccounts: options.maxAccounts,
     ...(options.ws ? { wsUrl: options.ws } : {}),
   });
   await COMMANDS[options.command]({ session, options, workspace, rpcUrl });

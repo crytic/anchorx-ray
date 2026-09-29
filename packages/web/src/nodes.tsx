@@ -1,5 +1,6 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import type { AccountNode, ProgramSummary } from "./api.js";
+import type { Stack } from "./graph.js";
 import { bytes, short, sol } from "./format.js";
 import { KIND_COLOR } from "./common.js";
 
@@ -12,6 +13,7 @@ export type ProgramData = {
 };
 
 export type AccountFlowNode = Node<AccountData, "account">;
+export type StackFlowNode = Node<{ stack: Stack }, "stack">;
 export type ProgramFlowNode = Node<ProgramData, "program">;
 
 const KIND_TAG: Record<AccountNode["kind"], string> = {
@@ -85,6 +87,13 @@ function authorityText(account: AccountNode | undefined): string {
   return "";
 }
 
+const noun = (n: number) => `${n.toLocaleString()} account${n === 1 ? "" : "s"}`;
+
+function accountCount(program: ProgramSummary, shown: number): string {
+  const total = program.inventory.reduce((n, r) => n + r.total, 0);
+  return total > shown ? `${shown.toLocaleString()} of ${noun(total)}` : noun(shown);
+}
+
 export function ProgramGroupView({ data, selected }: NodeProps<ProgramFlowNode>) {
   const { program, account, count, dim } = data;
   return (
@@ -98,7 +107,7 @@ export function ProgramGroupView({ data, selected }: NodeProps<ProgramFlowNode>)
         <div style={{ marginLeft: "auto", textAlign: "right" }} className="group-meta">
           <div>
             {program.deployed ? (
-              `${count} account${count === 1 ? "" : "s"}`
+              accountCount(program, count)
             ) : (
               <span className="chip bad">not deployed</span>
             )}
@@ -111,4 +120,34 @@ export function ProgramGroupView({ data, selected }: NodeProps<ProgramFlowNode>)
   );
 }
 
-export const nodeTypes = { account: AccountNodeView, program: ProgramGroupView };
+/** Accounts folded because their type has too many to draw; click to expand. */
+export function StackNodeView({ data }: NodeProps<StackFlowNode>) {
+  const { stack } = data;
+  return (
+    <div
+      className="acct stack"
+      style={{ ["--kind" as string]: KIND_COLOR[stack.kind] }}
+      title="Click to show them all"
+    >
+      <Handle type="target" position={Position.Left} />
+      <div className="acct-head">
+        <span className="acct-title">
+          {stack.label} ×{stack.count.toLocaleString()}
+        </span>
+        <span className="acct-kind">more</span>
+      </div>
+      <div className="acct-addr">folded · click to expand</div>
+      <div className="acct-foot">
+        <span className="acct-size" />
+        {stack.warnings > 0 && <span className="chip warn">⚠ {stack.warnings}</span>}
+      </div>
+      <Handle type="source" position={Position.Right} />
+    </div>
+  );
+}
+
+export const nodeTypes = {
+  account: AccountNodeView,
+  program: ProgramGroupView,
+  stack: StackNodeView,
+};

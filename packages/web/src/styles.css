@@ -1029,3 +1029,62 @@ button {
 select.input {
   padding-right: 24px;
 }
+
+.inventory {
+  margin: 0 0 6px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.inv-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.inv-type {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inv-row .n {
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.btn.tiny {
+  padding: 1px 6px;
+  font-size: 11px;
+  border-radius: 5px;
+}
+
+.layout-pending {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 5px 12px;
+  border-radius: 99px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.acct.stack {
+  box-shadow:
+    4px 4px 0 -1px var(--panel-2),
+    4px 4px 0 0 var(--border),
+    8px 8px 0 -1px var(--panel-2),
+    8px 8px 0 0 var(--border);
+}
+
+.acct.stack:hover {
+  border-color: var(--border-strong);
+}

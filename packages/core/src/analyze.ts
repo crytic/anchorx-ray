@@ -1,3 +1,4 @@
+import { inventory } from "./catalog.js";
 import type { CodecRegistry } from "./codec.js";
 import { hasOneConstraints, type Constraints } from "./constraints.js";
 import {
@@ -193,7 +194,8 @@ function attachUpgradeAuthorities(nodes: Nodes, index: Index): void {
   }
 }
 
-function summarize(codecs: CodecRegistry, nodes: Nodes): ProgramSummary[] {
+function summarize(codecs: CodecRegistry, nodes: Nodes, state: RawState): ProgramSummary[] {
+  const rows = inventory(state.catalog, state.accounts, codecs, state.referenced);
   return codecs.all().map((codec) => ({
     id: codec.id,
     name: codec.name,
@@ -202,6 +204,9 @@ function summarize(codecs: CodecRegistry, nodes: Nodes): ProgramSummary[] {
     accountTypes: (codec.idl.accounts ?? []).map((a) => a.name),
     instructions: codec.idl.instructions.map((i) => i.name),
     events: (codec.idl.events ?? []).map((e) => e.name),
+    inventory: rows
+      .filter((r) => r.program === codec.id)
+      .map(({ typeName, total, loaded }) => ({ typeName, total, loaded })),
   }));
 }
 
@@ -287,7 +292,7 @@ export function buildModel(
   const edges = buildEdges(nodes, index, hasOneConstraints(codecs, bindings, typeOf));
   danglingFindings(nodes, edges);
   nameAnonymous(nodes, edges, bindings);
-  const programs = summarize(codecs, nodes);
+  const programs = summarize(codecs, nodes, state);
   markUndeployed(programs, nodes);
   const accounts = [...nodes.values()];
   return { slot: state.slot, fetchedAt: state.fetchedAt, programs, accounts, edges };

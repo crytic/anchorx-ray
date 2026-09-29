@@ -5,6 +5,7 @@ import {
   guessSeeds,
   resolveFromInstruction,
   uniqueTemplates,
+  type GuessBudget,
   type GuessHints,
   type SeedContext,
   type SeedTemplate,
@@ -13,10 +14,23 @@ import type { InstructionBinding } from "./tx.js";
 import type { Finding, PdaInfo, RawAccount } from "./types.js";
 
 const MAX_HINT_KEYS = 256;
+/** Seed hashes allowed for the second, hint-based guessing pass (about a second). */
+const GUESS_BUDGET = 500_000;
+const OWN_DATA_ONLY: GuessHints = { pubkeys: [], args: new Map(), accountsOfType: () => [] };
 
 export interface AccountIndex {
   raw: Map<string, RawAccount>;
   decoded: Map<string, DecodedAccount>;
+}
+
+function rawByType(index: AccountIndex): Map<string, Record<string, unknown>[]> {
+  const byType = new Map<string, Record<string, unknown>[]>();
+  for (const decoded of index.decoded.values()) {
+    const list = byType.get(decoded.typeName);
+    if (list) list.push(decoded.raw);
+    else byType.set(decoded.typeName, [decoded.raw]);
+  }
+  return byType;
 }
 
 function makeHints(index: AccountIndex, bindings: InstructionBinding[]): GuessHints {
@@ -31,11 +45,11 @@ function makeHints(index: AccountIndex, bindings: InstructionBinding[]): GuessHi
   for (const [address, account] of index.raw) {
     if (account.owner === SYSTEM_PROGRAM) pubkeys.add(address);
   }
+  const byType = rawByType(index);
   return {
     pubkeys: [...pubkeys].slice(0, MAX_HINT_KEYS),
     args,
-    accountsOfType: (typeName) =>
-      [...index.decoded.values()].filter((d) => d.typeName === typeName).map((d) => d.raw),
+    accountsOfType: (typeName) => byType.get(typeName) ?? [],
   };
 }
 
@@ -81,12 +95,29 @@ class Resolver {
     return out;
   }
 
+  /**
+   * Two passes: seeds from each account's own fields (cheap, and how most
+   * Anchor PDAs are built), then observed keys and arguments for the rest,
+   * within a global derivation budget.
+   */
   fromAccountData(hints: GuessHints): void {
     for (const [address, ctx] of this.unexplained()) {
-      const templates = uniqueTemplates(this.templates.get(ctx.codec.id) ?? []);
-      const match = guessSeeds(address, templates, ctx, hints);
-      this.resolved.set(address, match?.info ?? { status: "unresolved" });
+      const match = guessSeeds(address, this.uniqueFor(ctx), ctx, OWN_DATA_ONLY);
+      if (match) this.resolved.set(address, match.info);
     }
+    const budget: GuessBudget = { remaining: GUESS_BUDGET };
+    for (const [address, ctx] of this.unexplained()) {
+      const match = guessSeeds(address, this.uniqueFor(ctx), ctx, hints, budget);
+      const exhausted = !match && budget.remaining <= 0;
+      this.resolved.set(
+        address,
+        match?.info ?? { status: "unresolved", ...(exhausted ? { incomplete: true } : {}) },
+      );
+    }
+  }
+
+  private uniqueFor(ctx: SeedContext): SeedTemplate[] {
+    return uniqueTemplates(this.templates.get(ctx.codec.id) ?? []);
   }
 }
 
@@ -105,21 +136,20 @@ export function resolvePdas(
   return resolver.resolved;
 }
 
-export function pdaFindings(info: PdaInfo, storedBump: unknown): Finding[] {
-  if (info.status === "unresolved") {
-    const message = "Off-curve account whose seeds match no IDL template";
-    return [{ severity: "info", code: "pda-unresolved", message }];
-  }
+function bumpFindings(
+  bump: number,
+  canonicalBump: number | undefined,
+  storedBump: unknown,
+): Finding[] {
   const findings: Finding[] = [];
-  const { bump, canonicalBump } = info;
-  if (bump !== undefined && canonicalBump !== undefined && bump !== canonicalBump) {
+  if (canonicalBump !== undefined && bump !== canonicalBump) {
     findings.push({
       severity: "warning",
       code: "pda-noncanonical-bump",
       message: `Derived with bump ${bump}; canonical bump is ${canonicalBump}`,
     });
   }
-  if (typeof storedBump === "number" && bump !== undefined && storedBump !== bump) {
+  if (typeof storedBump === "number" && storedBump !== bump) {
     findings.push({
       severity: "warning",
       code: "pda-stored-bump-mismatch",
@@ -127,4 +157,14 @@ export function pdaFindings(info: PdaInfo, storedBump: unknown): Finding[] {
     });
   }
   return findings;
+}
+
+export function pdaFindings(info: PdaInfo, storedBump: unknown): Finding[] {
+  if (info.status === "unresolved") {
+    const message = info.incomplete
+      ? "Off-curve account; seed search stopped at its budget before finding a match"
+      : "Off-curve account whose seeds match no IDL template";
+    return [{ severity: "info", code: "pda-unresolved", message }];
+  }
+  return info.bump === undefined ? [] : bumpFindings(info.bump, info.canonicalBump, storedBump);
 }

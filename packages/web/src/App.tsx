@@ -3,6 +3,7 @@ import { NavContext, type Navigation } from "./common.js";
 import { GraphView } from "./GraphView.js";
 import { defaultFilters } from "./graph.js";
 import { Inspector } from "./Inspector.js";
+import { LOAD_STEP } from "./Sidebar.js";
 import { SnapshotsView } from "./SnapshotsView.js";
 import { TimelineView } from "./TimelineView.js";
 import { TopBar, type View } from "./TopBar.js";
@@ -52,6 +53,8 @@ function GraphPane({ server, selected, onSelect }: GraphPaneProps) {
         selected={selected}
         onSelect={onSelect}
         flashes={server.flashes}
+        onLoadMore={(program, typeName) => server.loadMore(program, typeName, LOAD_STEP)}
+        onLoadAddress={server.loadAddress}
       />
       {account && (
         <Inspector

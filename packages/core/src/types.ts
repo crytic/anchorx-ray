@@ -26,6 +26,25 @@ export interface RawState {
   referenced: RawAccount[];
   /** Referenced addresses that do not exist on chain. */
   missing: string[];
+  /**
+   * Every account the programs own, with its type, from a discriminator-only
+   * scan. `accounts` holds full data for a capped subset of these.
+   */
+  catalog?: CatalogEntry[];
+}
+
+export interface CatalogEntry {
+  address: string;
+  program: string;
+  /** IDL account type from the discriminator; null when none matches. */
+  typeName: string | null;
+}
+
+export interface InventoryRow {
+  program: string;
+  typeName: string | null;
+  total: number;
+  loaded: number;
 }
 
 export type AccountKind =
@@ -60,6 +79,8 @@ export interface PdaInfo {
   seeds?: ResolvedSeed[];
   bump?: number;
   canonicalBump?: number;
+  /** Unresolved only because the seed search hit its budget. */
+  incomplete?: boolean;
 }
 
 export type Severity = "info" | "warning";
@@ -112,6 +133,8 @@ export interface ProgramSummary {
   accountTypes: string[];
   instructions: string[];
   events: string[];
+  /** Accounts on chain vs. loaded, per account type. */
+  inventory: { typeName: string | null; total: number; loaded: number }[];
 }
 
 export interface XrayModel {

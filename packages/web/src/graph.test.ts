@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { AccountNode, Edge, EdgeKind, XrayModel } from "./api.js";
-import { defaultFilters, groupId, neighbours, visibleGraph } from "./graph.js";
+import { defaultFilters, groupId, KEEP_WHEN_COLLAPSED, neighbours, visibleGraph } from "./graph.js";
 import { computeLayout, labelPoint, roundedPath } from "./layout.js";
 
 const PROGRAM = "Prog111111111111111111111111111111111111111";
@@ -40,6 +40,7 @@ const model: XrayModel = {
       accountTypes: [],
       instructions: [],
       events: [],
+      inventory: [],
     },
   ],
   accounts: [
@@ -100,6 +101,41 @@ describe("visibleGraph", () => {
 
   test("lists neighbours in both directions", () => {
     expect([...neighbours(model, "A")].toSorted()).toEqual(["B", PROGRAM, "W"].toSorted());
+  });
+});
+
+describe("folding large types", () => {
+  const vaults = Array.from({ length: 40 }, (_, i) => owned(`V${i}`, { typeName: "Vault" }));
+  vaults[33] = owned("V33", {
+    typeName: "Vault",
+    findings: [{ severity: "warning", code: "pda-noncanonical-bump", message: "m" }],
+  });
+  const big: XrayModel = {
+    ...model,
+    accounts: [...model.accounts, ...vaults],
+    edges: [...model.edges, ...vaults.map((v) => edge("field", v.address, "W", "owner"))],
+  };
+
+  test("keeps the most relevant accounts and folds the rest", () => {
+    const graph = visibleGraph(big, defaultFilters(), new Set(["V39"]));
+    const group = graph.groups[0];
+    const shown = group?.children.map((c) => c.address) ?? [];
+    expect(shown).toContain("V39"); // pinned (selected or just changed)
+    expect(shown).toContain("V33"); // has a warning
+    const shownVaults = group?.children.filter((c) => c.typeName === "Vault") ?? [];
+    expect(shownVaults).toHaveLength(KEEP_WHEN_COLLAPSED);
+    expect(group?.stacks).toEqual([
+      expect.objectContaining({ label: "Vault", count: 41 - KEEP_WHEN_COLLAPSED, warnings: 0 }),
+    ]);
+    const merged = graph.edges.find((e) => e.from === group?.stacks[0]?.id);
+    expect(merged).toMatchObject({ to: "W", label: "owner", count: 41 - KEEP_WHEN_COLLAPSED });
+  });
+
+  test("shows everything once the stack is expanded", () => {
+    const id = visibleGraph(big, defaultFilters()).groups[0]?.stacks[0]?.id ?? "";
+    const graph = visibleGraph(big, { ...defaultFilters(), expanded: new Set([id]) });
+    expect(graph.groups[0]?.stacks).toEqual([]);
+    expect(graph.groups[0]?.children.filter((c) => c.typeName === "Vault")).toHaveLength(41);
   });
 });
 

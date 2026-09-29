@@ -213,3 +213,46 @@ export async function seed(connection: Connection, actors: Actors): Promise<Seed
   );
   return { vaults, config, registry, entry, receipts: receipts.map((r) => r.publicKey) };
 }
+
+/** Genesis Vault and Receipt accounts, as a large deployed program would have. */
+export async function bulkAccounts(vaults: number, receipts: number): Promise<AccountToLoad[]> {
+  const coder = new BorshAccountsCoder(loadIdl("xray_vault"));
+  const programId = new PublicKey(VAULT_ID);
+  const [config] = PublicKey.findProgramAddressSync([Buffer.from("config")], programId);
+  const accounts: AccountToLoad[] = [];
+  for (let i = 0; i < vaults; i++) {
+    const owner = Keypair.generate().publicKey;
+    const id = new BN(i);
+    const [address, bump] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), owner.toBuffer(), id.toArrayLike(Buffer, "le", 8)],
+      programId,
+    );
+    const data = await coder.encode("Vault", {
+      owner,
+      config,
+      vault_id: id,
+      label: `vault-${i}`,
+      state: { Active: {} },
+      total_deposits: new BN(0),
+      delegate: null,
+      bump,
+    });
+    accounts.push({
+      address: address.toBase58(),
+      owner: VAULT_ID,
+      lamports: LAMPORTS_PER_SOL,
+      data,
+    });
+  }
+  for (let i = 0; i < receipts; i++) {
+    const data = await coder.encode("Receipt", {
+      vault: new PublicKey(accounts[i]?.address ?? VAULT_ID),
+      depositor: Keypair.generate().publicKey,
+      amount: new BN(i),
+      slot: new BN(0),
+    });
+    const address = Keypair.generate().publicKey.toBase58();
+    accounts.push({ address, owner: VAULT_ID, lamports: LAMPORTS_PER_SOL, data });
+  }
+  return accounts;
+}

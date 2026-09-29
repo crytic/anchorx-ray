@@ -1,4 +1,4 @@
-import ELK, { type ElkExtendedEdge, type ElkNode } from "elkjs/lib/elk.bundled.js";
+import type { ELK as ElkApi, ElkExtendedEdge, ElkNode } from "elkjs/lib/elk-api.js";
 import { GROUP_HEADER, NODE_HEIGHT, NODE_WIDTH, type VisibleGraph } from "./graph.js";
 
 export interface Point {
@@ -19,7 +19,26 @@ export interface Layout {
   routes: Map<string, Point[]>;
 }
 
-const elk = new ELK();
+let elk: Promise<ElkApi> | undefined;
+
+/**
+ * Lays out in a Web Worker in the browser, so graphs with thousands of
+ * accounts do not freeze the page; falls back to the in-thread build in Node.
+ */
+function getElk(): Promise<ElkApi> {
+  elk ??= (async () => {
+    if (typeof Worker !== "undefined") {
+      const [{ default: Elk }, { default: workerUrl }] = await Promise.all([
+        import("elkjs/lib/elk-api.js"),
+        import("elkjs/lib/elk-worker.min.js?url"),
+      ]);
+      return new Elk({ workerUrl });
+    }
+    const { default: Elk } = await import("elkjs/lib/elk.bundled.js");
+    return new Elk();
+  })();
+  return elk;
+}
 
 const ROOT_OPTIONS = {
   "elk.algorithm": "layered",
@@ -43,14 +62,18 @@ const leaf = (id: string): ElkNode => ({ id, width: NODE_WIDTH, height: NODE_HEI
 
 export function toElk(graph: VisibleGraph): ElkNode {
   const children: ElkNode[] = [
-    ...graph.groups.map((g) => ({
-      id: g.id,
-      layoutOptions: GROUP_OPTIONS,
+    ...graph.groups.map((g) => {
+      const members = [
+        ...g.children.map((c) => leaf(c.address)),
+        ...g.stacks.map((s) => leaf(s.id)),
+      ];
       // An empty group still needs room for its header.
-      ...(g.children.length === 0 ? { width: NODE_WIDTH + 44, height: GROUP_HEADER + 26 } : {}),
-      children: g.children.map((c) => leaf(c.address)),
-    })),
+      const size =
+        members.length === 0 ? { width: NODE_WIDTH + 44, height: GROUP_HEADER + 26 } : {};
+      return { id: g.id, layoutOptions: GROUP_OPTIONS, ...size, children: members };
+    }),
     ...graph.loose.map((n) => leaf(n.address)),
+    ...graph.looseStacks.map((s) => leaf(s.id)),
   ];
   const edges: ElkExtendedEdge[] = graph.edges.map((e) => ({
     id: e.id,
@@ -106,7 +129,7 @@ export function fromElk(root: ElkNode): Layout {
 }
 
 export async function computeLayout(graph: VisibleGraph): Promise<Layout> {
-  return fromElk(await elk.layout(toElk(graph)));
+  return fromElk(await (await getElk()).layout(toElk(graph)));
 }
 
 /** SVG path through orthogonal points, with rounded corners. */

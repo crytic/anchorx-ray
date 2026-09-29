@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import type { IdlInstructionAccountItem, IdlSeed } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
+import { isOnCurveBytes } from "./known.js";
 import type { ProgramCodec } from "./codec.js";
 import {
   argTypeAtPath,
@@ -145,27 +147,53 @@ function programIdFor(template: SeedTemplate, resolve: (seed: IdlSeed) => SeedBy
   return bytes?.length === 32 ? new PublicKey(bytes) : undefined;
 }
 
+const PDA_MARKER = Buffer.from("ProgramDerivedAddress");
+const MAX_SEEDS = 16;
+const MAX_SEED_LEN = 32;
+const ALL_BUMPS = Array.from({ length: 256 }, (_, i) => 255 - i);
+
+/** The address `create_program_address(seeds ++ [bump], program)` hashes to, before its curve check. */
+function pdaHash(seeds: Buffer[], bump: number, programId: Buffer): Buffer {
+  const hash = createHash("sha256");
+  for (const seed of seeds) hash.update(seed);
+  return hash
+    .update(Buffer.from([bump]))
+    .update(programId)
+    .update(PDA_MARKER)
+    .digest();
+}
+
+/** The bump find_program_address would pick: the highest one hashing off the curve. */
+function canonicalBump(seeds: Buffer[], programId: Buffer, matched: number): number {
+  for (let bump = 255; bump > matched; bump--) {
+    if (!isOnCurveBytes(pdaHash(seeds, bump, programId))) return bump;
+  }
+  return matched;
+}
+
 /**
- * Tries to derive `target` from `seeds`, first with the account's stored bump
- * (which catches non-canonical bumps), then by canonical search.
+ * Tries to derive `target` from `seeds`. Matching compares hashes against the
+ * target, which is already known to be off-curve, so the costly curve check
+ * only runs to confirm the canonical bump. With a stored bump, only it and the
+ * top bumps are tried; otherwise all 256.
  */
 function derive(
   seeds: Buffer[],
   programId: PublicKey,
   target: string,
   storedBump: number | undefined,
+  budget?: GuessBudget,
 ): { bump: number; canonicalBump: number } | undefined {
-  const [canonical, canonicalBump] = PublicKey.findProgramAddressSync(seeds, programId);
-  if (canonical.toBase58() === target) return { bump: canonicalBump, canonicalBump };
-  if (storedBump === undefined || storedBump === canonicalBump) return undefined;
-  try {
-    const address = PublicKey.createProgramAddressSync(
-      [...seeds, Buffer.from([storedBump])],
-      programId,
-    );
-    if (address.toBase58() === target) return { bump: storedBump, canonicalBump };
-  } catch {
-    // The stored bump yields an on-curve point: not a valid PDA for these seeds.
+  if (seeds.length >= MAX_SEEDS || seeds.some((seed) => seed.length > MAX_SEED_LEN))
+    return undefined;
+  const wanted = new PublicKey(target).toBuffer();
+  const program = programId.toBuffer();
+  const bumps = storedBump === undefined ? ALL_BUMPS : [...new Set([storedBump, 255, 254, 253])];
+  for (const bump of bumps) {
+    if (budget && budget.remaining-- <= 0) return undefined;
+    if (pdaHash(seeds, bump, program).equals(wanted)) {
+      return { bump, canonicalBump: canonicalBump(seeds, program, bump) };
+    }
   }
   return undefined;
 }
@@ -193,11 +221,12 @@ export function resolveFromInstruction(
     const resolved = candidates as Candidate[];
     const programId = programIdFor(template, (s) => scopeSeed(s, template, scope, ctx));
     if (!programId) continue;
+    // Seeds from a transaction are exact: search every bump, whatever the account stores.
     const bumps = derive(
       resolved.map((c) => c.bytes),
       programId,
       target,
-      storedBumpOf(ctx, target),
+      undefined,
     );
     if (!bumps) continue;
     matches.push({
@@ -308,41 +337,70 @@ function* product(lists: Candidate[][]): Generator<Candidate[]> {
  * Recovers seeds for a PDA no transaction explained, by trying values from the
  * account's own fields and from observed keys/arguments against each template.
  */
+/** Shared cap on address derivations, so huge account sets cannot stall the analysis. */
+export interface GuessBudget {
+  remaining: number;
+}
+
+interface GuessContext {
+  address: string;
+  own: { typeName: string; raw: Record<string, unknown> };
+  storedBump: number | undefined;
+  ctx: SeedContext;
+  hints: GuessHints;
+  budget: GuessBudget;
+}
+
+/** Candidate seed lists for a template, or undefined when it cannot or should not be tried. */
+function candidateLists(template: SeedTemplate, g: GuessContext): Candidate[][] | undefined {
+  if (template.program) return undefined;
+  const lists = template.seeds.map((s) => guessCandidates(s, template, g.own, g.ctx, g.hints));
+  const total = lists.reduce((n, l) => n * l.length, 1);
+  return total === 0 || total > MAX_COMBINATIONS ? undefined : lists;
+}
+
+function tryTemplate(template: SeedTemplate, g: GuessContext): PdaMatch | undefined {
+  const lists = candidateLists(template, g);
+  if (!lists) return undefined;
+  const programId = new PublicKey(template.declaringProgram);
+  for (const combo of product(lists)) {
+    if (g.budget.remaining <= 0) return undefined;
+    const seeds = combo.map((c) => c.bytes);
+    const bumps = derive(seeds, programId, g.address, g.storedBump, g.budget);
+    if (!bumps) continue;
+    const source = { instruction: template.instruction, account: template.account };
+    const info: PdaInfo = {
+      status: "verified",
+      method: "account-data",
+      source,
+      seeds: combo.map(toResolved),
+      ...bumps,
+    };
+    return { address: g.address, template, info };
+  }
+  return undefined;
+}
+
 export function guessSeeds(
   address: string,
   templates: SeedTemplate[],
   ctx: SeedContext,
   hints: GuessHints,
+  budget: GuessBudget = { remaining: Number.POSITIVE_INFINITY },
 ): PdaMatch | undefined {
   const own = ctx.accountData(address);
   if (!own) return undefined;
-  const storedBump = storedBumpOf(ctx, address);
+  const g: GuessContext = {
+    address,
+    own,
+    storedBump: storedBumpOf(ctx, address),
+    ctx,
+    hints,
+    budget,
+  };
   for (const template of templates) {
-    if (template.program) continue;
-    const lists = template.seeds.map((s) => guessCandidates(s, template, own, ctx, hints));
-    const total = lists.reduce((n, l) => n * l.length, 1);
-    if (total === 0 || total > MAX_COMBINATIONS) continue;
-    const programId = new PublicKey(template.declaringProgram);
-    for (const combo of product(lists)) {
-      const bumps = derive(
-        combo.map((c) => c.bytes),
-        programId,
-        address,
-        storedBump,
-      );
-      if (!bumps) continue;
-      return {
-        address,
-        template,
-        info: {
-          status: "verified",
-          method: "account-data",
-          source: { instruction: template.instruction, account: template.account },
-          seeds: combo.map(toResolved),
-          ...bumps,
-        },
-      };
-    }
+    const match = tryTemplate(template, g);
+    if (match) return match;
   }
   return undefined;
 }

@@ -15,8 +15,10 @@ export function formatSummary(model: XrayModel): string {
     `slot ${model.slot} · ${model.accounts.length} accounts · ${model.edges.length} edges`,
   ];
   for (const program of model.programs) {
-    const owned = model.accounts.filter((a) => a.program === program.id).length;
-    const state = program.deployed ? `${owned} accounts` : "not deployed";
+    const loaded = program.inventory.reduce((n, r) => n + r.loaded, 0);
+    const total = program.inventory.reduce((n, r) => n + r.total, 0);
+    const count = loaded < total ? `${loaded} of ${total} accounts loaded` : `${total} accounts`;
+    const state = program.deployed ? count : "not deployed";
     lines.push(`  ${program.name} ${program.id} (${state})`);
   }
   const findings = model.accounts.flatMap((a) => a.findings.map((f) => ({ a, f })));
