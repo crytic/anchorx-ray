@@ -1,0 +1,16 @@
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+xray_vault = "6PLfEPyKqpNThbdTSCBVuUBAjUpZCoh3DzdTDeLsbGh4"
+xray_registry = "DtkVbe7MzaPYfZ5cgmp1QaVWtd592LW5ffG5BVUp3sGx"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "echo 'run pnpm test:e2e from the repository root'"
