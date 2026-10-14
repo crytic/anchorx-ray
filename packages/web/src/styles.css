@@ -170,6 +170,47 @@ button {
   flex: 1;
 }
 
+.cluster-switch {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cluster-switch select {
+  max-width: 145px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 52px;
+    gap: 8px 12px;
+    padding: 8px 12px;
+  }
+
+  .brand {
+    white-space: nowrap;
+  }
+
+  .spacer,
+  .conn .mono {
+    display: none;
+  }
+
+  .conn {
+    margin-left: auto;
+  }
+}
+
 .conn {
   display: flex;
   align-items: center;
@@ -557,6 +598,8 @@ button {
 /* ---------- inspector ---------- */
 
 .inspector {
+  position: relative;
+  z-index: 6;
   width: 400px;
   border-left: 1px solid var(--border);
   background: var(--panel);
@@ -780,6 +823,120 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.shared-note {
+  margin: 0 0 10px;
+}
+
+.shared-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shared-group {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-2);
+}
+
+.shared-group summary {
+  display: flex;
+  list-style: none;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.shared-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.shared-group summary::before {
+  content: "▸";
+  color: var(--faint);
+}
+
+.shared-group[open] summary::before {
+  content: "▾";
+}
+
+.shared-group summary .faint {
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.shared-path {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.shared-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.shared-occurrence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
+.shared-occurrence .shared-path {
+  color: var(--muted);
+}
+
+.qualification-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.qualification-review {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+
+.qualification-evidence {
+  width: 100%;
+  color: var(--muted);
+}
+
+.qualification-evidence summary {
+  cursor: pointer;
+}
+
+.qualification-evidence > div {
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+.qualification-enforced {
+  color: var(--ok);
+}
+
+.qualification-potential_gap {
+  color: var(--warn);
+}
+
+.qualification-independent,
+.qualification-inconclusive {
+  color: var(--muted);
 }
 
 /* ---------- lists (timeline, snapshots) ---------- */

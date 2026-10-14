@@ -16,6 +16,7 @@ export interface CliOptions {
   txLimit: number;
   maxAccounts: number;
   port: number;
+  peers: { label: string; port: number }[];
   open: boolean;
   watch: boolean;
   snapshot?: string;
@@ -51,6 +52,7 @@ Options:
       --max-accounts <n> Program accounts loaded with full data; the rest are listed and
                          can be loaded from the UI (default: 500)
   -p, --port <n>         Web UI port (default: 3000)
+      --peer <label:port> Link to another local anchorx-ray UI; repeatable
       --no-open          Do not open a browser
       --no-watch         Do not subscribe to live updates
       --snapshot <name>  ui/scan/timeline: read a saved snapshot instead of the cluster
@@ -74,6 +76,22 @@ function splitList(values: string[] | undefined): string[] {
     .flatMap((v) => v.split(","))
     .map((v) => v.trim())
     .filter(Boolean);
+}
+
+function parsePeers(values: string[] | undefined): { label: string; port: number }[] {
+  const peers = (values ?? []).map((value) => {
+    const separator = value.lastIndexOf(":");
+    const label = value.slice(0, separator).trim();
+    const port = Number(value.slice(separator + 1));
+    if (separator < 1 || !label || !Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error(`--peer must be <label:port> with port 1-65535, got "${value}"`);
+    }
+    return { label, port };
+  });
+  if (new Set(peers.map((peer) => peer.port)).size !== peers.length) {
+    throw new Error("--peer ports must be unique");
+  }
+  return peers;
 }
 
 function commandOf(positionals: string[]): { command: Command; rest: string[] } {
@@ -119,6 +137,7 @@ export function parseCli(argv: string[]): ParsedCli {
       "tx-limit": { type: "string" },
       "max-accounts": { type: "string" },
       port: { type: "string", short: "p" },
+      peer: { type: "string", multiple: true },
       open: { type: "boolean", default: true },
       watch: { type: "boolean", default: true },
       snapshot: { type: "string" },
@@ -142,10 +161,14 @@ export function parseCli(argv: string[]): ParsedCli {
     txLimit: positiveInt(values["tx-limit"], "tx-limit", 100),
     maxAccounts: positiveInt(values["max-accounts"], "max-accounts", 500),
     port: positiveInt(values.port, "port", 3000),
+    peers: parsePeers(values.peer),
     open: values.open,
     watch: values.watch,
     json: values.json,
   };
+  if (options.peers.some((peer) => peer.port === options.port)) {
+    throw new Error("--peer port must differ from --port");
+  }
   for (const key of ["cluster", "rpc", "ws", "snapshot", "out"] as const) {
     const value = values[key];
     if (value !== undefined) options[key] = value;

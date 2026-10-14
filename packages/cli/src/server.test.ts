@@ -106,6 +106,16 @@ describe("UI server", () => {
     expect((await post("/api/refresh", "{}")).status).toBe(409);
   });
 
+  test("serves qualification state only for known accounts", async () => {
+    const model = JSON.parse((await get("/api/model")).body) as XrayModel;
+    const account = model.accounts[0]!.address;
+    const status = await get(`/api/qualification?account=${encodeURIComponent(account)}`);
+    expect(status.status).toBe(200);
+    expect(JSON.parse(status.body)).toMatchObject({ phase: "idle" });
+    expect((await get("/api/qualification?account=absent")).status).toBe(400);
+    expect((await post("/api/qualification", "{}")).status).toBe(400);
+  });
+
   test("serves the UI but nothing outside its directory", async () => {
     expect((await get("/")).body).toContain("<title>ui</title>");
     expect((await get("/some/client/route")).body).toContain("<title>ui</title>");

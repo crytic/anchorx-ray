@@ -11,6 +11,7 @@ import {
 import { bytes, KIND_LABEL, leaf, sol, when } from "./format.js";
 import { Address, CopyButton, KindSwatch, Section, useNav } from "./common.js";
 import { JsonTree } from "./JsonTree.js";
+import { SharedAddresses } from "./SharedAddresses.js";
 
 interface Props {
   model: XrayModel;
@@ -258,6 +259,7 @@ export function Inspector({ model, account, timeline, changeTick, onClose }: Pro
         <Facts account={account} model={model} />
       </Section>
       {account.pda && <Pda pda={account.pda} />}
+      <SharedAddresses model={model} account={account} />
       {account.decoded !== undefined && (
         <Section title={`Data · ${account.typeName}`}>
           <JsonTree value={account.decoded} />

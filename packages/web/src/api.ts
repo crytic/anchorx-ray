@@ -4,6 +4,7 @@ import type {
   SnapshotSummary,
   StateDiff,
   TimelineItem,
+  QualificationView,
   XrayModel,
 } from "@anchorx-ray/core";
 
@@ -20,6 +21,12 @@ export type {
   ObservedChange,
   PdaInfo,
   ProgramSummary,
+  QualificationEvidence,
+  QualificationReview,
+  QualificationVerdict,
+  QualificationView,
+  SharedAddress,
+  SharedAddressOccurrence,
   SessionEvent,
   SnapshotSummary,
   StateDiff,
@@ -34,6 +41,7 @@ export interface Status {
   snapshot?: string;
   warnings: string[];
   watching: boolean;
+  peers?: { label: string; port: number }[];
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -56,6 +64,9 @@ const post = <T>(path: string, body: unknown = {}) =>
 export const api = {
   status: () => request<Status>("/api/status"),
   model: () => request<XrayModel>("/api/model"),
+  qualification: (account: string) =>
+    request<QualificationView>(`/api/qualification?account=${encodeURIComponent(account)}`),
+  qualify: (account: string) => post<QualificationView>("/api/qualification", { account }),
   timeline: () => request<TimelineItem[]>("/api/timeline"),
   history: (address: string) =>
     request<ObservedChange[]>(`/api/history?address=${encodeURIComponent(address)}`),

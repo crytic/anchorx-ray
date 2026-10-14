@@ -64,6 +64,7 @@ async function listen(ctx: Context) {
     cluster: workspace.cluster,
     root: workspace.root,
     warnings: workspace.warnings,
+    peers: options.peers,
   };
   try {
     return await startServer({

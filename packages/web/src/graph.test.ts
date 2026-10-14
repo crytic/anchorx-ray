@@ -58,6 +58,7 @@ const model: XrayModel = {
     edge("field", "B", PROGRAM, "program"),
     edge("programdata", PROGRAM, "PD", "programdata"),
   ],
+  sharedAddresses: [],
 };
 
 describe("visibleGraph", () => {

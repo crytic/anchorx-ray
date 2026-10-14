@@ -8,8 +8,14 @@ the PDAs behind them, how accounts reference each other, and what each transacti
 Point it at an Anchor workspace and a running cluster (usually `solana-test-validator`), and it:
 
 - **Maps accounts.** Every account owned by your programs, decoded with the IDL and grouped
-  by program. Edges follow `Pubkey` fields and PDA seeds. Fields enforced by `has_one`
-  are drawn differently, so an unchecked reference is easy to spot.
+  by program. Edges follow `Pubkey` fields and PDA seeds. Fields with IDL `has_one`
+  evidence are drawn differently to guide code review.
+- **Shows shared addresses.** The account inspector groups equal `Pubkey` fields across loaded
+  accounts, including nested fields. It shows the field paths and any IDL `has_one` evidence
+  to guide a review of whether the equality is required by the on-chain program.
+- **Qualifies shared addresses with Codex.** Click *Qualify with Codex* in the inspector to
+  review field-pair patterns against local source. One review covers every loaded account
+  with that pattern; the result includes instruction scope and source lines.
 - **Re-derives PDAs.** Each off-curve account is checked against the IDL's `seeds`: first
   from the instructions that touched it, then from its own data. You see the seeds, the bump,
   and whether that bump is canonical.
@@ -30,6 +36,8 @@ Point it at an Anchor workspace and a running cluster (usually `solana-test-vali
   Convert older IDLs with `anchor idl convert`.
 - An RPC endpoint with your programs deployed. A local `solana-test-validator` works best: it
   serves transaction history and websocket subscriptions.
+- For AI qualification, the Codex CLI must be installed and signed in with ChatGPT using
+  `codex login`. This uses the subscription of the person running anchorx-ray.
 
 ## Usage
 
@@ -44,6 +52,17 @@ node /path/to/anchorx-ray/packages/cli/dist/cli.mjs
 
 It reads `target/idl/*.json`, takes program ids and the cluster from `Anchor.toml`, and opens
 the UI at <http://127.0.0.1:3000>. The server listens on loopback only.
+
+To switch between clusters in the UI, run one instance per cluster on different ports and link
+them with `--peer <label:port>`:
+
+```sh
+anchorx-ray ui --cluster mainnet --port 3000 --peer Local:3001
+anchorx-ray ui --cluster localnet --port 3001 --peer Mainnet:3000
+```
+
+Both instances need access to the workspace IDLs. The local instance also needs a running
+validator with the programs and accounts you want to inspect.
 
 ```text
 anchorx-ray [command] [options]
@@ -69,6 +88,7 @@ Options:
       --max-accounts <n> Program accounts loaded with full data; the rest are listed and
                          can be loaded from the UI (default: 500)
   -p, --port <n>         Web UI port (default: 3000)
+      --peer <label:port> Link to another local anchorx-ray UI; repeatable
       --no-open          Do not open a browser
       --no-watch         Do not subscribe to live updates
       --snapshot <name>  ui/scan/timeline: read a saved snapshot instead of the cluster
@@ -121,6 +141,15 @@ provider that allows it or a local validator.
 - **`has_one` edges** come from the IDL's `relations`. The IDL does not say which account type
   an instruction account has, so types are learned from transactions, falling back to Anchor's
   naming convention (`vault` → `Vault`).
+- **Shared addresses** are exact matches between non-default typed `Pubkey` fields in loaded,
+  decoded accounts. A match does not establish a required invariant. Missing `has_one` metadata does
+  not show that Rust constraints, PDA seeds or handler checks are absent; test a mismatched
+  address and inspect the relevant on-chain paths before treating it as a finding.
+- **AI qualification** groups matches by program, account type and field path before calling
+  Codex. Reviews run in read-only mode, in batches, and are cached by local source content and
+  field-pair pattern. Verdicts describe the code path they cover; they are leads for manual
+  verification, not proof about the deployed binary. The catalogue's unloaded accounts have
+  no field values, so they are not part of the match count.
 - **Live diffs** are attributed by slot: an account change is shown on the transactions of the
   same slot that could write that account. When several did, the diff is marked *shared slot*.
 - **History** is limited by the RPC node. `solana-test-validator` prunes old slots

@@ -49,6 +49,10 @@ describe("parseCli", () => {
       rpc: "http://x",
       out: "out.json",
     });
+    expect(run(["ui", "--peer", "Local:3001", "--peer", "Devnet:3002"]).peers).toEqual([
+      { label: "Local", port: 3001 },
+      { label: "Devnet", port: 3002 },
+    ]);
   });
 
   test("handles help and version", () => {
@@ -63,5 +67,10 @@ describe("parseCli", () => {
     expect(() => parseCli(["--tx-limit=-3"])).toThrow(/non-negative integer/);
     expect(() => parseCli(["--port", "abc"])).toThrow(/non-negative integer/);
     expect(() => parseCli(["--bogus"])).toThrow(/Unknown option/);
+    expect(() => parseCli(["--peer", "Local:0"])).toThrow(/--peer must be/);
+    expect(() => parseCli(["--peer", "Local:65536"])).toThrow(/--peer must be/);
+    expect(() => parseCli(["--peer", "Local"])).toThrow(/--peer must be/);
+    expect(() => parseCli(["--peer", "Local:3001", "--peer", "Devnet:3001"])).toThrow(/unique/);
+    expect(() => parseCli(["--peer", "Self:3000"])).toThrow(/differ/);
   });
 });

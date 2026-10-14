@@ -20,6 +20,8 @@ import type {
   ProgramSummary,
   RawAccount,
   RawState,
+  SharedAddress,
+  SharedAddressOccurrence,
   XrayModel,
 } from "./types.js";
 
@@ -173,6 +175,27 @@ function buildEdges(nodes: Nodes, index: Index, constraints: Constraints): Edge[
     .map((e) => ({ ...e, id: `${e.kind}:${e.from}:${e.to}:${e.label}` }));
 }
 
+/** Index exact Pubkey matches without relying on graph edges or a loaded target account. */
+function sharedAddresses(index: Index, nodes: Nodes, constraints: Constraints): SharedAddress[] {
+  const byValue = new Map<string, SharedAddressOccurrence[]>();
+  for (const [account, decoded] of index.decoded) {
+    const node = nodes.get(account);
+    if (!node) continue;
+    for (const { path, pubkey } of decoded.pubkeys) {
+      if (pubkey === DEFAULT_PUBKEY) continue;
+      const occurrence: SharedAddressOccurrence = { account, path };
+      const by = constraints.get(`${node.program}:${decoded.typeName}.${path}`);
+      if (by) occurrence.hasOneIn = [...by].toSorted();
+      const occurrences = byValue.get(pubkey) ?? [];
+      occurrences.push(occurrence);
+      byValue.set(pubkey, occurrences);
+    }
+  }
+  return [...byValue]
+    .filter(([, occurrences]) => occurrences.length > 1)
+    .map(([value, occurrences]) => ({ value, occurrences }));
+}
+
 function danglingFindings(nodes: Nodes, edges: Edge[]): void {
   for (const edge of edges) {
     if (edge.kind !== "field" || nodes.get(edge.to)?.kind !== "missing") continue;
@@ -289,13 +312,22 @@ export function buildModel(
     if (!nodes.has(address)) nodes.set(address, missingNode(address));
   attachUpgradeAuthorities(nodes, index);
   const typeOf = (address: string) => index.decoded.get(address)?.typeName;
-  const edges = buildEdges(nodes, index, hasOneConstraints(codecs, bindings, typeOf));
+  const constraints = hasOneConstraints(codecs, bindings, typeOf);
+  const edges = buildEdges(nodes, index, constraints);
+  const shared = sharedAddresses(index, nodes, constraints);
   danglingFindings(nodes, edges);
   nameAnonymous(nodes, edges, bindings);
   const programs = summarize(codecs, nodes, state);
   markUndeployed(programs, nodes);
   const accounts = [...nodes.values()];
-  return { slot: state.slot, fetchedAt: state.fetchedAt, programs, accounts, edges };
+  return {
+    slot: state.slot,
+    fetchedAt: state.fetchedAt,
+    programs,
+    accounts,
+    edges,
+    sharedAddresses: shared,
+  };
 }
 
 function referencesOf(account: RawAccount, codecs: CodecRegistry): string[] {

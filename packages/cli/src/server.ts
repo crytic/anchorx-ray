@@ -2,6 +2,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import type { Session, SessionEvent } from "@anchorx-ray/core";
+import { QualificationService } from "./qualification.js";
 
 export interface ServerStatus {
   rpcUrl: string;
@@ -10,6 +11,7 @@ export interface ServerStatus {
   /** Name of the snapshot being inspected offline, if any. */
   snapshot?: string;
   warnings: string[];
+  peers?: { label: string; port: number }[];
 }
 
 export interface ServerOptions {
@@ -18,6 +20,7 @@ export interface ServerOptions {
   /** Directory with the built web UI. */
   webDir: string;
   port: number;
+  qualification?: QualificationService;
 }
 
 type Handler = (req: http.IncomingMessage, url: URL) => unknown;
@@ -110,7 +113,10 @@ function loadAccounts(session: Session, body: Record<string, unknown>) {
   return session.loadMore(program, typeName, count);
 }
 
-function routes(options: ServerOptions): Record<string, Handler> {
+function routes(
+  options: ServerOptions,
+  qualification: QualificationService,
+): Record<string, Handler> {
   const { session, status } = options;
   const live = () => {
     if (status.snapshot)
@@ -119,6 +125,8 @@ function routes(options: ServerOptions): Record<string, Handler> {
   return {
     "GET /api/status": () => ({ ...status, watching: session.watching }),
     "GET /api/model": () => session.model(),
+    "GET /api/qualification": (_req, url) =>
+      badRequest(() => qualification.view(session.model(), url.searchParams.get("account") ?? "")),
     "GET /api/timeline": () => session.timeline(),
     "GET /api/history": (_req, url) =>
       session.accountHistory(url.searchParams.get("address") ?? ""),
@@ -130,6 +138,14 @@ function routes(options: ServerOptions): Record<string, Handler> {
     "POST /api/refresh": async () => {
       live();
       return session.refresh();
+    },
+    "POST /api/qualification": async (req) => {
+      const { account } = await readJson(req);
+      if (typeof account !== "string") throw new HttpError(400, '"account" must be a string');
+      const model = session.model();
+      badRequest(() => qualification.view(model, account));
+      qualification.start(model);
+      return qualification.view(model, account);
     },
     "POST /api/load": async (req) => {
       live();
@@ -186,11 +202,16 @@ function sendJson(res: http.ServerResponse, status: number, body: unknown): void
   res.end(JSON.stringify(body));
 }
 
-async function handle(options: ServerOptions, req: http.IncomingMessage, res: http.ServerResponse) {
+async function handle(
+  options: ServerOptions,
+  qualification: QualificationService,
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+) {
   checkRequest(req);
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
   if (url.pathname === "/api/events") return streamEvents(options.session, req, res);
-  const handler = routes(options)[`${req.method} ${url.pathname}`];
+  const handler = routes(options, qualification)[`${req.method} ${url.pathname}`];
   if (handler) return sendJson(res, 200, await handler(req, url));
   if (url.pathname.startsWith("/api/"))
     throw new HttpError(404, `No route ${req.method} ${url.pathname}`);
@@ -200,13 +221,15 @@ async function handle(options: ServerOptions, req: http.IncomingMessage, res: ht
 
 /** Starts the loopback-only HTTP server for the web UI and its JSON/SSE API. */
 export function startServer(options: ServerOptions): Promise<http.Server> {
+  const qualification = options.qualification ?? new QualificationService(options.status.root);
   const server = http.createServer((req, res) => {
-    handle(options, req, res).catch((error: unknown) => {
+    handle(options, qualification, req, res).catch((error: unknown) => {
       const status = error instanceof HttpError ? error.status : 500;
       if (res.headersSent) return res.end();
       sendJson(res, status, { error: (error as Error).message });
     });
   });
+  server.on("close", () => qualification.stop());
   return new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(options.port, "127.0.0.1", () => resolve(server));

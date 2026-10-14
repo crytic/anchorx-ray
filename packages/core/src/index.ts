@@ -15,6 +15,8 @@ export {
 export { defaultWsUrl, Session } from "./session.js";
 export type { ObservedChange, SessionEvent, SessionOptions, TimelineItem } from "./session.js";
 export { seedBytesFor, typeAtPath } from "./seeds.js";
+export { indexSharedPatterns } from "./shared-patterns.js";
+export type { SharedPatternIndex } from "./shared-patterns.js";
 export { listSnapshots, loadSnapshot, saveSnapshot, SNAPSHOT_FORMAT } from "./snapshot.js";
 export type { Snapshot, SnapshotSummary } from "./snapshot.js";
 export { decodeTransaction } from "./tx.js";

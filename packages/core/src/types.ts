@@ -125,6 +125,68 @@ export interface Edge {
   constrainedBy?: string[];
 }
 
+/** One typed Pubkey field containing an address shared with another field. */
+export interface SharedAddressOccurrence {
+  account: string;
+  path: string;
+  /** Instructions whose IDL declares a has_one relation for this field. */
+  hasOneIn?: string[];
+}
+
+export interface SharedAddress {
+  value: string;
+  occurrences: SharedAddressOccurrence[];
+}
+
+/** One field position in an account schema, independent of a concrete account. */
+export interface SharedField {
+  program: string;
+  typeName: string;
+  path: string;
+}
+
+export interface SharedPatternExample {
+  value: string;
+  left: SharedAddressOccurrence;
+  right: SharedAddressOccurrence;
+}
+
+/** Equal Pubkey fields grouped by schema so one code review covers many accounts. */
+export interface SharedPattern {
+  id: string;
+  left: SharedField;
+  right: SharedField;
+  matchedValues: number;
+  examples: SharedPatternExample[];
+}
+
+export type QualificationVerdict = "enforced" | "potential_gap" | "independent" | "inconclusive";
+
+export interface QualificationEvidence {
+  path: string;
+  line: number;
+  note: string;
+}
+
+export interface QualificationReview {
+  id: string;
+  verdict: QualificationVerdict;
+  summary: string;
+  scope: string;
+  evidence: QualificationEvidence[];
+}
+
+export interface QualificationView {
+  phase: "idle" | "running" | "complete" | "failed";
+  completed: number;
+  total: number;
+  loadedAccounts: number;
+  catalogAccounts: number;
+  groups: { value: string; patterns: (SharedPattern & { review?: QualificationReview })[] }[];
+  error?: string;
+  reviewedAt?: string;
+}
+
 export interface ProgramSummary {
   id: string;
   name: string;
@@ -143,4 +205,6 @@ export interface XrayModel {
   programs: ProgramSummary[];
   accounts: AccountNode[];
   edges: Edge[];
+  /** Equal Pubkey fields among accounts whose data was loaded and decoded. */
+  sharedAddresses: SharedAddress[];
 }

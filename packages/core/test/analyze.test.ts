@@ -57,6 +57,68 @@ describe("buildModel on the recorded demo state", () => {
     expect(model.edges.some((e) => e.label === "entries[0]")).toBe(true);
   });
 
+  test("groups equal typed addresses across accounts and repeated fields", () => {
+    const owner = model.sharedAddresses.find(
+      (group) => group.value === "YdS6tCzHnjVxeuRGkvFThRydMBvesjsKQUHWN4TXcr8",
+    );
+    expect(owner?.occurrences.map((item) => item.path)).toEqual([
+      "authority",
+      "owner",
+      "depositor",
+      "owner",
+    ]);
+    expect(owner?.occurrences.find((item) => item.path === "authority")?.hasOneIn).toEqual([
+      "register",
+    ]);
+    const admin = model.sharedAddresses.find(
+      (group) => group.value === "DCYZPbER4kaYM8CMzwvcDJvfhVcigoarWUJTPNkqpmsv",
+    );
+    expect(admin?.occurrences.some((item) => item.path === "treasury")).toBe(true);
+    expect(admin?.occurrences.some((item) => item.path === "admin")).toBe(true);
+    expect(
+      model.sharedAddresses.some((group) => group.value === "11111111111111111111111111111111"),
+    ).toBe(false);
+  });
+
+  test("keeps shared fields when their target account was not fetched", () => {
+    const sharedValue = "YdS6tCzHnjVxeuRGkvFThRydMBvesjsKQUHWN4TXcr8";
+    const state = {
+      ...snapshot.state,
+      referenced: snapshot.state.referenced.filter((account) => account.address !== sharedValue),
+    };
+    const partial = buildModel(state, codecs, bindings);
+    expect(partial.accounts.some((account) => account.address === sharedValue)).toBe(false);
+    expect(partial.edges.some((edge) => edge.kind === "field" && edge.to === sharedValue)).toBe(
+      false,
+    );
+    expect(
+      partial.sharedAddresses.find((group) => group.value === sharedValue)?.occurrences,
+    ).toHaveLength(4);
+  });
+
+  test("reports two matching fields inside one decoded account", () => {
+    const configAddress = "CKh8uev6UG7JS1usmKce9dD7DGkcYEozGzjeykWKTuE1";
+    const config = snapshot.state.accounts.find((account) => account.address === configAddress);
+    if (!config) throw new Error("recorded Config account missing");
+    const state = {
+      ...snapshot.state,
+      accounts: [config],
+      referenced: [],
+      missing: [],
+      catalog: [],
+    };
+    const isolated = buildModel(state, codecs, []);
+    expect(isolated.sharedAddresses).toEqual([
+      {
+        value: "DCYZPbER4kaYM8CMzwvcDJvfhVcigoarWUJTPNkqpmsv",
+        occurrences: [
+          { account: configAddress, path: "admin", hasOneIn: ["set_state"] },
+          { account: configAddress, path: "treasury" },
+        ],
+      },
+    ]);
+  });
+
   test("recovers the same seeds from account data alone", () => {
     const blind = buildModel(snapshot.state, codecs, []);
     for (const node of blind.accounts.filter((a) => a.kind === "pda")) {

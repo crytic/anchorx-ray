@@ -34,6 +34,33 @@ function Brand() {
   );
 }
 
+function ClusterSwitch({ status }: { status: Status | undefined }) {
+  if (!status?.peers?.length) return null;
+  const label = status.cluster === "localnet" ? "Local" : status.cluster;
+  return (
+    <label className="cluster-switch">
+      Cluster
+      <select
+        aria-label="Cluster"
+        value="current"
+        onChange={(event) => {
+          const port = Number(event.target.value);
+          if (Number.isInteger(port) && port > 0) {
+            window.location.assign(`http://127.0.0.1:${port}/`);
+          }
+        }}
+      >
+        <option value="current">{label}</option>
+        {status.peers.map((peer) => (
+          <option key={peer.port} value={peer.port}>
+            {peer.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function TopBar({ status, model, view, counts, connected, busy, onView, onRefresh }: Props) {
   const conn = connection(status, connected);
   return (
@@ -55,6 +82,7 @@ export function TopBar({ status, model, view, counts, connected, busy, onView, o
           </button>
         ))}
       </nav>
+      <ClusterSwitch status={status} />
       <div className="spacer" />
       <div className="conn">
         <span className={`dot ${conn.dot}`} />
