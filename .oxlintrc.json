@@ -1,0 +1,65 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "import",
+    "react",
+    "vitest"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    "eslint/max-lines-per-function": [
+      "warn",
+      {
+        "max": 100,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ],
+    "eslint/complexity": [
+      "warn",
+      {
+        "max": 8
+      }
+    ],
+    "eslint/max-params": [
+      "warn",
+      {
+        "max": 5
+      }
+    ],
+    "import/no-relative-parent-imports": "error",
+    "typescript/no-explicit-any": "error",
+    "react/react-in-jsx-scope": "off",
+    "import/no-unassigned-import": [
+      "warn",
+      {
+        "allow": [
+          "**/*.css"
+        ]
+      }
+    ]
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/fixtures/**",
+    "examples/**"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "**/test/**",
+        "**/*.test.ts",
+        "**/*.test.tsx"
+      ],
+      "rules": {
+        "eslint/max-lines-per-function": "off",
+        "eslint/complexity": "off"
+      }
+    }
+  ]
+}
